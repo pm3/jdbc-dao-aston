@@ -423,6 +423,12 @@ try {
 
 ---
 
+## Testing
+
+DAO interfaces cleanly separate all database access from application logic. In the consuming project, each DAO can be tested independently via integration tests against a real database — no mocks, 100% control over every SQL query, parameter binding, and result mapping.
+
+---
+
 ## Requirements
 
 - Java 17+
