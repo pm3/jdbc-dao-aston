@@ -33,8 +33,8 @@ public final class EntityConfig<T> {
         private final Class<T> type;
         private final String table;
         private String pk = "id";
-        private String createdAt = "createdat";
-        private String updatedAt = "updatedat";
+        private String createdAt;
+        private String updatedAt;
 
         private Builder(Class<T> type, String table) {
             this.type = type;

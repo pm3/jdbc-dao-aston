@@ -48,7 +48,7 @@ class PostgresIntegrationTest {
     @DaoApi
     public interface UserDao {
         EntityConfig<User> USER = EntityConfig.of(User.class, "users")
-                .updatedAt("").build();
+                .createdAt("createdat").updatedAt("").build();
 
         User loadById(String id);
         void insertUser(User user);

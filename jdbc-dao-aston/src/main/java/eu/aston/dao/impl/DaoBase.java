@@ -29,23 +29,23 @@ public abstract class DaoBase {
     // --- Entity operations ---
 
     protected <T> T entityLoad(EntityConfig<T> config, Object pkValue) {
-        return SqlHelper.entityLoad(dataSource, objectMapper, config, pkValue);
+        return EntityBinder.forConfig(config).load(dataSource, objectMapper, pkValue);
     }
 
     protected <T> void entityInsert(EntityConfig<T> config, T entity) {
-        SqlHelper.entityInsert(dataSource, objectMapper, config, entity);
+        EntityBinder.forConfig(config).insert(dataSource, objectMapper, entity);
     }
 
     protected <T> void entityUpdate(EntityConfig<T> config, T entity) {
-        SqlHelper.entityUpdate(dataSource, objectMapper, config, entity);
+        EntityBinder.forConfig(config).update(dataSource, objectMapper, entity);
     }
 
     protected <T> void entitySave(EntityConfig<T> config, T entity) {
-        SqlHelper.entitySave(dataSource, objectMapper, config, entity);
+        EntityBinder.forConfig(config).save(dataSource, objectMapper, entity);
     }
 
     protected <T> void entityDelete(EntityConfig<T> config, Object entityOrPk) {
-        SqlHelper.entityDelete(dataSource, objectMapper, config, entityOrPk);
+        EntityBinder.forConfig(config).delete(dataSource, objectMapper, entityOrPk);
     }
 
     // --- Query operations ---

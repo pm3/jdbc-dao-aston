@@ -11,7 +11,7 @@ import java.util.Optional;
 public interface TestUserDao {
 
     EntityConfig<TestUser> USER = EntityConfig.of(TestUser.class, "users")
-            .updatedAt("").build();
+            .createdAt("createdat").build();
 
     TestUser loadById(String id);
 

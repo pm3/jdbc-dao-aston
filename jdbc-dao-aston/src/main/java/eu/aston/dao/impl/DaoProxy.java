@@ -90,28 +90,28 @@ public final class DaoProxy implements InvocationHandler {
     private MethodExecutor buildLoadExecutor(Method method) {
         Class<?> returnType = method.getReturnType();
         EntityConfig<?> config = findConfig(returnType);
-        return args -> SqlHelper.entityLoad(dataSource, objectMapper, config, args[0]);
+        return args -> EntityBinder.forConfig(config).load(dataSource, objectMapper, args[0]);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private MethodExecutor buildInsertExecutor(Method method) {
         Class<?> paramType = method.getParameterTypes()[0];
         EntityConfig config = findConfig(paramType);
-        return args -> { SqlHelper.entityInsert(dataSource, objectMapper, config, args[0]); return null; };
+        return args -> { EntityBinder.forConfig(config).insert(dataSource, objectMapper, args[0]); return null; };
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private MethodExecutor buildUpdateExecutor(Method method) {
         Class<?> paramType = method.getParameterTypes()[0];
         EntityConfig config = findConfig(paramType);
-        return args -> { SqlHelper.entityUpdate(dataSource, objectMapper, config, args[0]); return null; };
+        return args -> { EntityBinder.forConfig(config).update(dataSource, objectMapper, args[0]); return null; };
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private MethodExecutor buildSaveExecutor(Method method) {
         Class<?> paramType = method.getParameterTypes()[0];
         EntityConfig config = findConfig(paramType);
-        return args -> { SqlHelper.entitySave(dataSource, objectMapper, config, args[0]); return null; };
+        return args -> { EntityBinder.forConfig(config).save(dataSource, objectMapper, args[0]); return null; };
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -120,12 +120,12 @@ public final class DaoProxy implements InvocationHandler {
             Class<?> paramType = method.getParameterTypes()[0];
             EntityConfig config = entityConfigs.get(paramType);
             if (config != null) {
-                return args -> { SqlHelper.entityDelete(dataSource, objectMapper, config, args[0]); return null; };
+                return args -> { EntityBinder.forConfig(config).delete(dataSource, objectMapper, args[0]); return null; };
             }
             // parameter is a PK value — find the only config or match by method name suffix
             if (entityConfigs.size() == 1) {
                 EntityConfig singleConfig = entityConfigs.values().iterator().next();
-                return args -> { SqlHelper.entityDelete(dataSource, objectMapper, singleConfig, args[0]); return null; };
+                return args -> { EntityBinder.forConfig(singleConfig).delete(dataSource, objectMapper, args[0]); return null; };
             }
         }
         throw new DaoException("Cannot resolve delete entity for method: " + method.getName());
