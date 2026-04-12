@@ -90,8 +90,20 @@ public final class JdbcBinder {
 
     private JdbcBinder() {}
 
-    /** Resolve setter by type. Returns null for unknown types (JSON). */
+    /** JSON fallback setter — serializes value to JSON string via ObjectMapper stored in thread-local or passed separately. */
+    public static final ParamSetter JSON_SETTER = (ps, index, value) -> {
+        // This setter requires ObjectMapper — use setParamWithOm for JSON columns
+        throw new UnsupportedOperationException("JSON setter must be called via setParam with ObjectMapper");
+    };
+
+    /** Resolve setter by type. Returns JSON_SETTER for unknown types (never null). */
     public static ParamSetter setterFor(Class<?> type) {
+        ParamSetter setter = SETTERS.get(type);
+        return setter != null ? setter : JSON_SETTER;
+    }
+
+    /** Resolve setter by type, null for unknown. */
+    public static ParamSetter scalarSetterFor(Class<?> type) {
         return SETTERS.get(type);
     }
 
@@ -100,14 +112,14 @@ public final class JdbcBinder {
         return READERS.get(type);
     }
 
-    /** Set param with null handling. Uses pre-resolved setter or falls back to JSON. */
+    /** Set param with null handling. Uses pre-resolved setter; JSON_SETTER triggers JSON serialization. */
     public static void setParam(PreparedStatement ps, int index, Object value,
                                  ParamSetter setter, ObjectMapper om) throws SQLException {
         if (value == null) {
             ps.setNull(index, Types.NULL);
             return;
         }
-        if (setter != null) {
+        if (setter != JSON_SETTER) {
             setter.set(ps, index, value);
             return;
         }

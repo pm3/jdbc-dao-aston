@@ -56,7 +56,12 @@ class DaoProxyTest {
 
         @Query("SELECT count(*) FROM users")
         long countAll();
+
+        @Query("SELECT * FROM users WHERE name=:name AND email=:email")
+        List<User> findByFilter(UserFilter filter);
     }
+
+    public record UserFilter(String name, String email) {}
 
     // --- JSON test ---
 
@@ -205,6 +210,28 @@ class DaoProxyTest {
         assertEquals("Widget", loaded.name());
         assertEquals("red", loaded.props().get("color"));
         assertEquals("L", loaded.props().get("size"));
+    }
+
+    // --- Bean param expansion ---
+
+    @Test
+    void beanParamExpand() {
+        UserDao dao = DaoRegistry.forClass(UserDao.class, dataSource);
+        dao.insertUser(new User("1", "John", "john@test.com"));
+        dao.insertUser(new User("2", "Jane", "jane@test.com"));
+
+        List<User> results = dao.findByFilter(new UserFilter("John", "john@test.com"));
+        assertEquals(1, results.size());
+        assertEquals("1", results.get(0).id());
+    }
+
+    @Test
+    void beanParamExpandNoMatch() {
+        UserDao dao = DaoRegistry.forClass(UserDao.class, dataSource);
+        dao.insertUser(new User("1", "John", "john@test.com"));
+
+        List<User> results = dao.findByFilter(new UserFilter("Nobody", "x@test.com"));
+        assertTrue(results.isEmpty());
     }
 
     // --- Condition tests ---

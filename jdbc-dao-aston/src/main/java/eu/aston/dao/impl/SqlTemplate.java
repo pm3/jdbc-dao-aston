@@ -20,6 +20,18 @@ public final class SqlTemplate {
     private static final Pattern NAMED_PARAM = Pattern.compile("(?<!:):(\\w+)");
     private static final Pattern OPTIONAL_BLOCK = Pattern.compile("/\\*\\*(.*?)\\*\\*/", Pattern.DOTALL);
 
+    /** Pre-built "?,?,?..." strings for Spread expansion (index = number of values). */
+    private static final String[] SPREAD_PLACEHOLDERS = new String[33];
+    static {
+        var sb = new StringBuilder();
+        SPREAD_PLACEHOLDERS[0] = "";
+        for (int i = 1; i < SPREAD_PLACEHOLDERS.length; i++) {
+            if (i > 1) sb.append(',');
+            sb.append('?');
+            SPREAD_PLACEHOLDERS[i] = sb.toString();
+        }
+    }
+
     private static final ConcurrentHashMap<String, SqlTemplate> cache = new ConcurrentHashMap<>();
 
     // --- Fragment types ---
@@ -45,28 +57,54 @@ public final class SqlTemplate {
 
     // --- Public API ---
 
-    record ParsedSql(String sql, List<Object> params) {}
+    record ParsedSql(String sql, List<Object> params, JdbcBinder.ParamSetter[] setters) {}
 
     /** Get or create a cached SqlTemplate for the given template string. */
     public static SqlTemplate of(String template) {
         return cache.computeIfAbsent(template, SqlTemplate::parse);
     }
 
-    /** Assemble final SQL with positional params from named params. */
-    public ParsedSql process(Map<String, Object> namedParams) {
-        // Fast path: simple template without Spread/ICondition values
-        if (simpleSql != null && !hasSpecialParams(namedParams)) {
-            var positionalParams = new ArrayList<Object>(simpleParamNames.size());
-            for (String name : simpleParamNames) {
-                positionalParams.add(namedParams.get(name));
-            }
-            return new ParsedSql(simpleSql, positionalParams);
+    /** Assemble final SQL from QueryParam definitions + args array. Setters lazily pre-resolved. */
+    public ParsedSql process(Map<String, QueryParam> paramDefs, Object[] args) {
+        if (paramDefs == null || paramDefs.isEmpty()) {
+            if (simpleSql != null) return new ParsedSql(simpleSql, List.of(), null);
+            var sb = new StringBuilder();
+            var positionalParams = new ArrayList<Object>();
+            assembleFragments(fragments, Map.of(), sb, positionalParams);
+            return new ParsedSql(sb.toString(), positionalParams, null);
         }
-        // Slow path: assemble from fragments
+        // Fast path: simple template without Spread/ICondition values
+        if (simpleSql != null && !hasSpecialArgs(paramDefs, args)) {
+            int size = simpleParamNames.size();
+            var positionalParams = new ArrayList<Object>(size);
+            var setters = new JdbcBinder.ParamSetter[size];
+            for (int i = 0; i < size; i++) {
+                QueryParam pp = paramDefs.get(simpleParamNames.get(i));
+                positionalParams.add(args[pp.position]);
+                setters[i] = pp.setter();
+            }
+            return new ParsedSql(simpleSql, positionalParams, setters);
+        }
+        // Slow path: convert to Map<String, Object> for fragment assembly
+        var namedParams = new java.util.HashMap<String, Object>(paramDefs.size());
+        for (var entry : paramDefs.entrySet()) {
+            namedParams.put(entry.getKey(), args[entry.getValue().position]);
+        }
         var sb = new StringBuilder();
         var positionalParams = new ArrayList<Object>();
         assembleFragments(fragments, namedParams, sb, positionalParams);
-        return new ParsedSql(sb.toString(), positionalParams);
+        return new ParsedSql(sb.toString(), positionalParams, null);
+    }
+
+    private boolean hasSpecialArgs(Map<String, QueryParam> paramDefs, Object[] args) {
+        for (String name : simpleParamNames) {
+            QueryParam pp = paramDefs.get(name);
+            if (pp != null) {
+                Object value = args[pp.position];
+                if (value instanceof Spread<?> || value instanceof ICondition) return true;
+            }
+        }
+        return false;
     }
 
     // --- Parsing (runs once per template) ---
@@ -141,14 +179,6 @@ public final class SqlTemplate {
 
     // --- Assembly (runs per call, but no regex) ---
 
-    private boolean hasSpecialParams(Map<String, Object> namedParams) {
-        for (String name : simpleParamNames) {
-            Object value = namedParams.get(name);
-            if (value instanceof Spread<?> || value instanceof ICondition) return true;
-        }
-        return false;
-    }
-
     private static void assembleFragments(List<Fragment> fragments, Map<String, Object> params,
                                            StringBuilder sb, List<Object> positionalParams) {
         for (Fragment f : fragments) {
@@ -172,7 +202,10 @@ public final class SqlTemplate {
                                      StringBuilder sb, List<Object> positionalParams) {
         Object value = params.get(paramName);
         if (value instanceof Spread<?> spread) {
-            sb.append(String.join(",", Collections.nCopies(spread.values().size(), "?")));
+            int size = spread.values().size();
+            sb.append(size < SPREAD_PLACEHOLDERS.length
+                    ? SPREAD_PLACEHOLDERS[size]
+                    : String.join(",", Collections.nCopies(size, "?")));
             positionalParams.addAll(spread.values());
         } else if (value instanceof ICondition cond) {
             sb.append(cond.sql().isEmpty() ? "1=1" : cond.sql());

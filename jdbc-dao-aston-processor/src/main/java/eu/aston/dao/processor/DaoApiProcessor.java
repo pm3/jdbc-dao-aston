@@ -146,7 +146,6 @@ public class DaoApiProcessor extends AbstractProcessor {
         bw.write("import eu.aston.dao.DaoProvider;\n");
         bw.write("import eu.aston.dao.EntityConfig;\n");
         bw.write("import javax.sql.DataSource;\n");
-        bw.write("import java.lang.reflect.Type;\n");
         bw.write("import java.util.List;\n");
         bw.write("import java.util.Optional;\n\n");
 
@@ -183,6 +182,16 @@ public class DaoApiProcessor extends AbstractProcessor {
         String returnTypeStr = toTypeString(method.returnType);
         String methodName = method.name;
 
+        // Static QueryParam map for @Query methods with params
+        boolean hasParams = method.queryValue != null && !method.params.isEmpty();
+        if (hasParams) {
+            boolean expandBean = method.params.size() == 1 && isBeanType(method.params.get(0).type);
+            String ppExpr = expandBean
+                    ? buildBeanQueryParamMapExpr(method.params.get(0))
+                    : buildQueryParamMapExpr(method.params);
+            bw.write("    private static final java.util.Map<String, eu.aston.dao.impl.QueryParam> pp$" + methodName + " = " + ppExpr + ";\n");
+        }
+
         bw.write("    @Override\n");
         bw.write("    public " + returnTypeStr + " " + methodName + "(");
         for (int i = 0; i < method.params.size(); i++) {
@@ -192,7 +201,7 @@ public class DaoApiProcessor extends AbstractProcessor {
         bw.write(") {\n");
 
         if (method.queryValue != null) {
-            generateQueryMethodBody(bw, method);
+            generateQueryMethodBody(bw, method, hasParams);
         } else {
             generateEntityMethodBody(bw, method, configs, ifaceName);
         }
@@ -200,23 +209,29 @@ public class DaoApiProcessor extends AbstractProcessor {
         bw.write("    }\n\n");
     }
 
-    private void generateQueryMethodBody(BufferedWriter bw, MethodInfo method) throws IOException {
+    private void generateQueryMethodBody(BufferedWriter bw, MethodInfo method, boolean hasParams) throws IOException {
         String sql = escapeJava(method.queryValue);
         ReturnKind kind = resolveReturnKind(method.returnType);
         String[] elementTypeInfo = resolveElementType(method.returnType);
         String elementType = elementTypeInfo[0];
-        String genericTypeExpr = elementTypeInfo[1];
 
-        // Build param arrays
-        String namesArray = "new String[]{" + joinParamNames(method.params) + "}";
-        String valuesArray = "new Object[]{" + joinParamValues(method.params) + "}";
+        String ppExpr = hasParams ? "pp$" + method.name : "java.util.Map.of()";
+        String argsExpr;
+        if (!hasParams) {
+            argsExpr = "null";
+        } else {
+            boolean expandBean = method.params.size() == 1 && isBeanType(method.params.get(0).type);
+            argsExpr = expandBean
+                    ? "expandBeanArgs(" + ppExpr + ", " + method.params.get(0).name + ")"
+                    : "new Object[]{" + joinParamValues(method.params) + "}";
+        }
 
         switch (kind) {
-            case VOID -> bw.write("        queryExecute(\"" + sql + "\", " + namesArray + ", " + valuesArray + ");\n");
-            case INT -> bw.write("        return queryUpdate(\"" + sql + "\", " + namesArray + ", " + valuesArray + ");\n");
-            case ONE -> bw.write("        return queryOne(" + elementType + ".class, " + genericTypeExpr + ", \"" + sql + "\", " + namesArray + ", " + valuesArray + ");\n");
-            case OPTIONAL -> bw.write("        return queryOptional(" + elementType + ".class, " + genericTypeExpr + ", \"" + sql + "\", " + namesArray + ", " + valuesArray + ");\n");
-            case LIST -> bw.write("        return queryList(" + elementType + ".class, " + genericTypeExpr + ", \"" + sql + "\", " + namesArray + ", " + valuesArray + ");\n");
+            case VOID -> bw.write("        queryExecute(\"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
+            case INT -> bw.write("        return queryUpdate(\"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
+            case ONE -> bw.write("        return queryOne(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
+            case OPTIONAL -> bw.write("        return queryOptional(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
+            case LIST -> bw.write("        return queryList(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
         }
     }
 
@@ -339,12 +354,23 @@ public class DaoApiProcessor extends AbstractProcessor {
         return type.toString();
     }
 
-    private String joinParamNames(List<ParamInfo> params) {
-        var sb = new StringBuilder();
+    /** Generate QueryParam map from bean properties via BeanMetaRegistry (runtime resolution). */
+    private String buildBeanQueryParamMapExpr(ParamInfo beanParam) {
+        String beanType = toRawTypeString(beanParam.type);
+        return "eu.aston.dao.impl.QueryParam.fromBeanMeta(eu.aston.beanmeta.BeanMetaRegistry.forClass(" + beanType + ".class))";
+    }
+
+    /** Generate Map.of("name", new QueryParam("name", 0, Type.class), ...) expression. */
+    private String buildQueryParamMapExpr(List<ParamInfo> params) {
+        var sb = new StringBuilder("java.util.Map.of(");
         for (int i = 0; i < params.size(); i++) {
             if (i > 0) sb.append(", ");
-            sb.append("\"").append(params.get(i).name).append("\"");
+            String name = params.get(i).name;
+            String typeName = toRawTypeString(params.get(i).type);
+            sb.append("\"").append(name).append("\", ");
+            sb.append("new eu.aston.dao.impl.QueryParam(\"").append(name).append("\", ").append(i).append(", ").append(typeName).append(".class)");
         }
+        sb.append(")");
         return sb.toString();
     }
 
@@ -355,6 +381,23 @@ public class DaoApiProcessor extends AbstractProcessor {
             sb.append(params.get(i).name);
         }
         return sb.toString();
+    }
+
+    private static final Set<String> SCALAR_TYPE_NAMES = Set.of(
+            "java.lang.String", "java.lang.Boolean", "boolean",
+            "java.lang.Integer", "int", "java.lang.Long", "long",
+            "java.lang.Short", "short", "java.lang.Byte", "byte",
+            "java.lang.Float", "float", "java.lang.Double", "double",
+            "java.math.BigDecimal", "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
+            "java.util.UUID", "byte[]",
+            "eu.aston.dao.Spread", "eu.aston.dao.ICondition"
+    );
+
+    private boolean isBeanType(TypeMirror type) {
+        if (type.getKind().isPrimitive()) return false;
+        if (type.getKind() != TypeKind.DECLARED) return false;
+        String name = ((TypeElement) ((DeclaredType) type).asElement()).getQualifiedName().toString();
+        return !SCALAR_TYPE_NAMES.contains(name);
     }
 
     private String escapeJava(String s) {

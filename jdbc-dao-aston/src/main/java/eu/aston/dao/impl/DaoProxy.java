@@ -18,126 +18,123 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Reflection-based proxy InvocationHandler for DAO interfaces.
- * Fallback when no compile-time generated implementation is found.
+ * All resolution happens eagerly in the constructor — invoke() is a straight lookup + call.
  */
 public final class DaoProxy implements InvocationHandler {
 
-    private final DataSource dataSource;
-    private final ObjectMapper objectMapper;
-    private final Map<Class<?>, EntityConfig<?>> entityConfigs;
-    private final Map<Method, MethodExecutor> executors = new ConcurrentHashMap<>();
+    private final Map<Method, MethodExecutor> executors;
 
-    public DaoProxy(Class<?> daoInterface, DataSource dataSource, ObjectMapper objectMapper) {
-        this.dataSource = dataSource;
-        this.objectMapper = objectMapper;
-        this.entityConfigs = scanEntityConfigs(daoInterface);
+    public DaoProxy(Class<?> daoInterface, DataSource ds, ObjectMapper om) {
+        var entityConfigs = scanEntityConfigs(daoInterface);
+        var map = new HashMap<Method, MethodExecutor>();
+        for (Method method : daoInterface.getMethods()) {
+            if (method.getDeclaringClass() == Object.class) continue;
+            if (method.isDefault()) continue;
+            map.put(method, buildExecutor(method, ds, om, entityConfigs));
+        }
+        this.executors = Map.copyOf(map);
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        if (method.getDeclaringClass() == Object.class) {
-            return method.invoke(this, args);
-        }
-        var executor = executors.computeIfAbsent(method, this::buildExecutor);
-        return executor.execute(args);
+        MethodExecutor executor = executors.get(method);
+        return executor != null ? executor.execute(args) : method.invoke(this, args);
     }
 
-    private MethodExecutor buildExecutor(Method method) {
+    // --- Executor building (runs once per method in constructor) ---
+
+    private static MethodExecutor buildExecutor(Method method, DataSource ds, ObjectMapper om,
+                                                 Map<Class<?>, EntityConfig<?>> entityConfigs) {
         Query queryAnn = method.getAnnotation(Query.class);
         if (queryAnn != null) {
-            return buildQueryExecutor(method, queryAnn.value());
+            return buildQueryExecutor(method, queryAnn.value(), ds, om);
         }
-        return buildEntityExecutor(method);
+        return buildEntityExecutor(method, ds, om, entityConfigs);
     }
 
     // --- @Query methods ---
 
-    private MethodExecutor buildQueryExecutor(Method method, String sqlTemplate) {
+    private static MethodExecutor buildQueryExecutor(Method method, String sql, DataSource ds, ObjectMapper om) {
         String[] paramNames = getParamNames(method);
-        ReturnKind returnKind = resolveReturnKind(method);
-        Class<?> elementType = resolveElementType(method);
-        Type genericElementType = resolveGenericElementType(method);
+        Class<?> type = resolveElementType(method);
 
-        return args -> {
-            var params = buildParamMap(paramNames, args);
-            return switch (returnKind) {
-                case VOID -> { SqlHelper.execute(dataSource, objectMapper, sqlTemplate, params); yield null; }
-                case INT -> SqlHelper.executeUpdate(dataSource, objectMapper, sqlTemplate, params);
-                case ONE -> SqlHelper.queryOne(dataSource, objectMapper, elementType, genericElementType, sqlTemplate, params);
-                case OPTIONAL -> SqlHelper.queryOptional(dataSource, objectMapper, elementType, genericElementType, sqlTemplate, params);
-                case LIST -> SqlHelper.queryList(dataSource, objectMapper, elementType, genericElementType, sqlTemplate, params);
-            };
+        boolean expandBean = paramNames.length == 1
+                && !JdbcBinder.isScalar(method.getParameterTypes()[0])
+                && !eu.aston.dao.Spread.class.isAssignableFrom(method.getParameterTypes()[0])
+                && !eu.aston.dao.ICondition.class.isAssignableFrom(method.getParameterTypes()[0]);
+
+        Map<String, QueryParam> paramDefs;
+        ArgsMapper argsMapper;
+        if (expandBean) {
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            BeanMeta beanMeta = BeanMetaRegistry.forClass(method.getParameterTypes()[0]);
+            paramDefs = QueryParam.fromBeanMeta(beanMeta);
+            Map<String, QueryParam> pd = paramDefs; // effectively final
+            argsMapper = args -> extractBeanArgs(beanMeta, pd, args[0]);
+        } else {
+            paramDefs = buildQueryParams(paramNames, method.getParameterTypes());
+            argsMapper = args -> args;
+        }
+
+        // Pre-select the exact SqlHelper method — no switch at runtime
+        Map<String, QueryParam> pd = paramDefs;
+        return switch (resolveReturnKind(method)) {
+            case VOID -> args -> { SqlHelper.execute(ds, om, sql, pd, argsMapper.map(args)); return null; };
+            case INT -> args -> SqlHelper.executeUpdate(ds, om, sql, pd, argsMapper.map(args));
+            case ONE -> args -> SqlHelper.queryOne(ds, om, type, sql, pd, argsMapper.map(args));
+            case OPTIONAL -> args -> SqlHelper.queryOptional(ds, om, type, sql, pd, argsMapper.map(args));
+            case LIST -> args -> SqlHelper.queryList(ds, om, type, sql, pd, argsMapper.map(args));
         };
     }
 
     // --- Entity convention methods ---
 
-    private MethodExecutor buildEntityExecutor(Method method) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static MethodExecutor buildEntityExecutor(Method method, DataSource ds, ObjectMapper om,
+                                                       Map<Class<?>, EntityConfig<?>> entityConfigs) {
         String name = method.getName();
-        if (name.startsWith("load")) return buildLoadExecutor(method);
-        if (name.startsWith("insert")) return buildInsertExecutor(method);
-        if (name.startsWith("update")) return buildUpdateExecutor(method);
-        if (name.startsWith("save")) return buildSaveExecutor(method);
-        if (name.startsWith("delete")) return buildDeleteExecutor(method);
-        throw new DaoException("Cannot resolve method: " + method.getName()
-                + " — must have @Query or start with load/insert/update/save/delete");
-    }
-
-    private MethodExecutor buildLoadExecutor(Method method) {
-        Class<?> returnType = method.getReturnType();
-        EntityConfig<?> config = findConfig(returnType);
-        return args -> EntityBinder.forConfig(config).load(dataSource, objectMapper, args[0]);
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private MethodExecutor buildInsertExecutor(Method method) {
-        Class<?> paramType = method.getParameterTypes()[0];
-        EntityConfig config = findConfig(paramType);
-        return args -> { EntityBinder.forConfig(config).insert(dataSource, objectMapper, args[0]); return null; };
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private MethodExecutor buildUpdateExecutor(Method method) {
-        Class<?> paramType = method.getParameterTypes()[0];
-        EntityConfig config = findConfig(paramType);
-        return args -> { EntityBinder.forConfig(config).update(dataSource, objectMapper, args[0]); return null; };
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private MethodExecutor buildSaveExecutor(Method method) {
-        Class<?> paramType = method.getParameterTypes()[0];
-        EntityConfig config = findConfig(paramType);
-        return args -> { EntityBinder.forConfig(config).save(dataSource, objectMapper, args[0]); return null; };
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private MethodExecutor buildDeleteExecutor(Method method) {
-        if (method.getParameterTypes().length == 1) {
-            Class<?> paramType = method.getParameterTypes()[0];
-            EntityConfig config = entityConfigs.get(paramType);
-            if (config != null) {
-                return args -> { EntityBinder.forConfig(config).delete(dataSource, objectMapper, args[0]); return null; };
-            }
-            // parameter is a PK value — find the only config or match by method name suffix
-            if (entityConfigs.size() == 1) {
-                EntityConfig singleConfig = entityConfigs.values().iterator().next();
-                return args -> { EntityBinder.forConfig(singleConfig).delete(dataSource, objectMapper, args[0]); return null; };
-            }
+        if (name.startsWith("load")) {
+            EntityConfig<?> config = findConfig(entityConfigs, method.getReturnType());
+            return args -> config.binder().load(ds, om, args[0]);
         }
-        throw new DaoException("Cannot resolve delete entity for method: " + method.getName());
+        if (name.startsWith("insert")) {
+            EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
+            return args -> { config.binder().insert(ds, om, args[0]); return null; };
+        }
+        if (name.startsWith("update")) {
+            EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
+            return args -> { config.binder().update(ds, om, args[0]); return null; };
+        }
+        if (name.startsWith("save")) {
+            EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
+            return args -> { config.binder().save(ds, om, args[0]); return null; };
+        }
+        if (name.startsWith("delete")) {
+            EntityConfig config = resolveDeleteConfig(entityConfigs, method);
+            return args -> { config.binder().delete(ds, om, args[0]); return null; };
+        }
+        throw new DaoException("Cannot resolve method: " + name
+                + " — must have @Query or start with load/insert/update/save/delete");
     }
 
     // --- Helpers ---
 
-    private EntityConfig<?> findConfig(Class<?> beanType) {
-        EntityConfig<?> config = entityConfigs.get(beanType);
-        if (config == null) {
-            throw new DaoException("No EntityConfig found for type: " + beanType.getName());
+    @SuppressWarnings("rawtypes")
+    private static EntityConfig resolveDeleteConfig(Map<Class<?>, EntityConfig<?>> entityConfigs, Method method) {
+        if (method.getParameterTypes().length == 1) {
+            EntityConfig<?> config = entityConfigs.get(method.getParameterTypes()[0]);
+            if (config != null) return config;
+            if (entityConfigs.size() == 1) return entityConfigs.values().iterator().next();
         }
+        throw new DaoException("Cannot resolve delete entity for method: " + method.getName());
+    }
+
+    private static EntityConfig<?> findConfig(Map<Class<?>, EntityConfig<?>> entityConfigs, Class<?> beanType) {
+        EntityConfig<?> config = entityConfigs.get(beanType);
+        if (config == null) throw new DaoException("No EntityConfig found for type: " + beanType.getName());
         return config;
     }
 
@@ -157,6 +154,26 @@ public final class DaoProxy implements InvocationHandler {
         return configs;
     }
 
+    private static Map<String, QueryParam> buildQueryParams(String[] names, Class<?>[] types) {
+        if (names.length == 0) return Map.of();
+        var map = new HashMap<String, QueryParam>(names.length);
+        for (int i = 0; i < names.length; i++) {
+            map.put(names[i], new QueryParam(names[i], i, types[i]));
+        }
+        return Map.copyOf(map);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object[] extractBeanArgs(BeanMeta meta, Map<String, QueryParam> paramDefs, Object bean) {
+        Object[] args = new Object[paramDefs.size()];
+        if (bean != null) {
+            for (var entry : paramDefs.entrySet()) {
+                args[entry.getValue().position] = meta.get(bean, entry.getKey());
+            }
+        }
+        return args;
+    }
+
     private static String[] getParamNames(Method method) {
         Parameter[] params = method.getParameters();
         String[] names = new String[params.length];
@@ -166,36 +183,22 @@ public final class DaoProxy implements InvocationHandler {
         return names;
     }
 
-    private static Map<String, Object> buildParamMap(String[] names, Object[] args) {
-        var map = new HashMap<String, Object>();
-        if (args != null) {
-            for (int i = 0; i < names.length; i++) {
-                map.put(names[i], args[i]);
-            }
-        }
-        return map;
-    }
-
-    private static String getSimpleName(Method method) {
-        return method.getName();
-    }
-
     // --- Return type resolution ---
 
-    enum ReturnKind { VOID, INT, ONE, OPTIONAL, LIST }
+    private enum ReturnKind { VOID, INT, ONE, OPTIONAL, LIST }
 
-    static ReturnKind resolveReturnKind(Method method) {
-        Class<?> returnType = method.getReturnType();
-        if (returnType == void.class) return ReturnKind.VOID;
-        if (returnType == int.class || returnType == Integer.class) return ReturnKind.INT;
-        if (returnType == Optional.class) return ReturnKind.OPTIONAL;
-        if (returnType == List.class) return ReturnKind.LIST;
+    private static ReturnKind resolveReturnKind(Method method) {
+        Class<?> rt = method.getReturnType();
+        if (rt == void.class) return ReturnKind.VOID;
+        if (rt == int.class || rt == Integer.class) return ReturnKind.INT;
+        if (rt == Optional.class) return ReturnKind.OPTIONAL;
+        if (rt == List.class) return ReturnKind.LIST;
         return ReturnKind.ONE;
     }
 
-    static Class<?> resolveElementType(Method method) {
-        Class<?> returnType = method.getReturnType();
-        if (returnType == Optional.class || returnType == List.class) {
+    private static Class<?> resolveElementType(Method method) {
+        Class<?> rt = method.getReturnType();
+        if (rt == Optional.class || rt == List.class) {
             Type genericReturn = method.getGenericReturnType();
             if (genericReturn instanceof ParameterizedType pt) {
                 Type arg = pt.getActualTypeArguments()[0];
@@ -203,22 +206,16 @@ public final class DaoProxy implements InvocationHandler {
                 if (arg instanceof ParameterizedType pt2) return (Class<?>) pt2.getRawType();
             }
         }
-        return returnType;
-    }
-
-    static Type resolveGenericElementType(Method method) {
-        Class<?> returnType = method.getReturnType();
-        if (returnType == Optional.class || returnType == List.class) {
-            Type genericReturn = method.getGenericReturnType();
-            if (genericReturn instanceof ParameterizedType pt) {
-                return pt.getActualTypeArguments()[0];
-            }
-        }
-        return returnType;
+        return rt;
     }
 
     @FunctionalInterface
     interface MethodExecutor {
         Object execute(Object[] args);
+    }
+
+    @FunctionalInterface
+    private interface ArgsMapper {
+        Object[] map(Object[] args);
     }
 }

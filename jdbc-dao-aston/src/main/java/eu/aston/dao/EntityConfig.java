@@ -1,5 +1,7 @@
 package eu.aston.dao;
 
+import eu.aston.dao.impl.EntityBinder;
+
 /**
  * Entity configuration — maps a bean/record class to a database table.
  */
@@ -10,6 +12,7 @@ public final class EntityConfig<T> {
     private final String pk;
     private final String createdAt;
     private final String updatedAt;
+    private volatile EntityBinder<T> binder;
 
     private EntityConfig(Class<T> type, String table, String pk, String createdAt, String updatedAt) {
         this.type = type;
@@ -24,6 +27,20 @@ public final class EntityConfig<T> {
     public String pk() { return pk; }
     public String createdAt() { return createdAt; }
     public String updatedAt() { return updatedAt; }
+
+    public EntityBinder<T> binder() {
+        EntityBinder<T> b = binder;
+        if (b == null) {
+            synchronized (this) {
+                b = binder;
+                if (b == null) {
+                    b = new EntityBinder<>(this);
+                    this.binder = b;
+                }
+            }
+        }
+        return b;
+    }
 
     public static <T> Builder<T> of(Class<T> type, String table) {
         return new Builder<>(type, table);

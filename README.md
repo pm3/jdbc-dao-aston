@@ -100,8 +100,10 @@ EntityConfig<User> USER = EntityConfig.of(User.class, "users")
 | Config | Default | Override |
 |---|---|---|
 | Primary key | `id` | `.pk("customid")` |
-| Created timestamp | `createdat` (if property exists) | `.createdAt("customcol")` |
-| Updated timestamp | `updatedat` (if property exists) | `.updatedAt("customcol")` |
+| Created timestamp | *(none)* | `.createdAt("createdat")` |
+| Updated timestamp | *(none)* | `.updatedAt("updatedat")` |
+
+When `createdAt`/`updatedAt` is configured and the value is `null` during insert, the column is omitted from the INSERT statement so the database DEFAULT can apply.
 
 ### Column name matching
 
@@ -223,6 +225,43 @@ long countActive(boolean active);
 @Query("SELECT email FROM users WHERE id=:id")
 Optional<String> findEmailById(String id);
 ```
+
+---
+
+## Bean Parameter Expansion
+
+When a `@Query` method has a **single parameter** that is a bean or record (not a scalar type), its properties are automatically expanded as named parameters. This avoids manually listing each field:
+
+```java
+public record UserFilter(String name, String email) {}
+
+@DaoApi
+public interface UserDao {
+
+    EntityConfig<User> USER = EntityConfig.of(User.class, "users").build();
+
+    @Query("SELECT * FROM users WHERE name=:name AND email=:email")
+    List<User> findByFilter(UserFilter filter);
+}
+```
+
+```java
+// filter.name() → :name, filter.email() → :email
+List<User> users = userDao.findByFilter(new UserFilter("John", "john@test.com"));
+```
+
+This works with optional blocks too:
+
+```java
+@Query("SELECT * FROM users WHERE 1=1 /** AND name=:name **/ /** AND email=:email **/")
+List<User> search(UserFilter filter);
+```
+
+Bean expansion applies only when:
+- There is exactly **one** parameter
+- The parameter type is a **bean or record** (not a scalar, `Spread`, or `ICondition`)
+
+For multiple parameters or scalar types, standard named parameter mapping is used.
 
 ---
 

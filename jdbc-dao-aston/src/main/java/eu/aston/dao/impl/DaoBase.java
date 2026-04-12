@@ -1,10 +1,11 @@
 package eu.aston.dao.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.aston.beanmeta.BeanMeta;
+import eu.aston.beanmeta.BeanMetaRegistry;
 import eu.aston.dao.EntityConfig;
 
 import javax.sql.DataSource;
-import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,54 +30,56 @@ public abstract class DaoBase {
     // --- Entity operations ---
 
     protected <T> T entityLoad(EntityConfig<T> config, Object pkValue) {
-        return EntityBinder.forConfig(config).load(dataSource, objectMapper, pkValue);
+        return config.binder().load(dataSource, objectMapper, pkValue);
     }
 
     protected <T> void entityInsert(EntityConfig<T> config, T entity) {
-        EntityBinder.forConfig(config).insert(dataSource, objectMapper, entity);
+        config.binder().insert(dataSource, objectMapper, entity);
     }
 
     protected <T> void entityUpdate(EntityConfig<T> config, T entity) {
-        EntityBinder.forConfig(config).update(dataSource, objectMapper, entity);
+        config.binder().update(dataSource, objectMapper, entity);
     }
 
     protected <T> void entitySave(EntityConfig<T> config, T entity) {
-        EntityBinder.forConfig(config).save(dataSource, objectMapper, entity);
+        config.binder().save(dataSource, objectMapper, entity);
     }
 
     protected <T> void entityDelete(EntityConfig<T> config, Object entityOrPk) {
-        EntityBinder.forConfig(config).delete(dataSource, objectMapper, entityOrPk);
+        config.binder().delete(dataSource, objectMapper, entityOrPk);
     }
 
     // --- Query operations ---
 
-    protected <T> T queryOne(Class<T> type, Type genericType, String sql, String[] names, Object[] values) {
-        return SqlHelper.queryOne(dataSource, objectMapper, type, genericType, sql, buildParamMap(names, values));
+    protected <T> T queryOne(Class<T> type, String sql, Map<String, QueryParam> paramDefs, Object[] args) {
+        return SqlHelper.queryOne(dataSource, objectMapper, type, sql, paramDefs, args);
     }
 
-    protected <T> Optional<T> queryOptional(Class<T> type, Type genericType, String sql, String[] names, Object[] values) {
-        return SqlHelper.queryOptional(dataSource, objectMapper, type, genericType, sql, buildParamMap(names, values));
+    protected <T> Optional<T> queryOptional(Class<T> type, String sql, Map<String, QueryParam> paramDefs, Object[] args) {
+        return SqlHelper.queryOptional(dataSource, objectMapper, type, sql, paramDefs, args);
     }
 
-    protected <T> List<T> queryList(Class<T> type, Type genericType, String sql, String[] names, Object[] values) {
-        return SqlHelper.queryList(dataSource, objectMapper, type, genericType, sql, buildParamMap(names, values));
+    protected <T> List<T> queryList(Class<T> type, String sql, Map<String, QueryParam> paramDefs, Object[] args) {
+        return SqlHelper.queryList(dataSource, objectMapper, type, sql, paramDefs, args);
     }
 
-    protected void queryExecute(String sql, String[] names, Object[] values) {
-        SqlHelper.execute(dataSource, objectMapper, sql, buildParamMap(names, values));
+    protected void queryExecute(String sql, Map<String, QueryParam> paramDefs, Object[] args) {
+        SqlHelper.execute(dataSource, objectMapper, sql, paramDefs, args);
     }
 
-    protected int queryUpdate(String sql, String[] names, Object[] values) {
-        return SqlHelper.executeUpdate(dataSource, objectMapper, sql, buildParamMap(names, values));
+    protected int queryUpdate(String sql, Map<String, QueryParam> paramDefs, Object[] args) {
+        return SqlHelper.executeUpdate(dataSource, objectMapper, sql, paramDefs, args);
     }
 
-    private static Map<String, Object> buildParamMap(String[] names, Object[] values) {
-        var map = new HashMap<String, Object>();
-        if (names != null && values != null) {
-            for (int i = 0; i < names.length; i++) {
-                map.put(names[i], values[i]);
-            }
+    /** Expand a single bean/record into an Object[] matching QueryParam positions. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    protected static Object[] expandBeanArgs(Map<String, QueryParam> paramDefs, Object bean) {
+        if (bean == null) return new Object[paramDefs.size()];
+        BeanMeta meta = BeanMetaRegistry.forClass(bean.getClass());
+        Object[] args = new Object[paramDefs.size()];
+        for (var entry : paramDefs.entrySet()) {
+            args[entry.getValue().position] = meta.get(bean, entry.getKey());
         }
-        return map;
+        return args;
     }
 }
