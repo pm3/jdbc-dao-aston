@@ -61,10 +61,14 @@ Compile-time generation with reflection fallback:
 
 | Mode | How | When |
 |------|-----|------|
-| **Compile-time** | Annotation processor generates implementation class registered via `ServiceLoader` | `@DaoApi` annotation present + processor on classpath |
-| **Reflection fallback** | Runtime proxy via `java.lang.reflect.Proxy` | No generated class found for the given interface |
+| **Compile-time** | Annotation processor generates DAO implementation class + bean meta classes, registered via `ServiceLoader` | `@DaoApi` on interface and/or `@GenerateMeta` on record/bean + processor on classpath |
+| **Reflection fallback** | Runtime proxy via `java.lang.reflect.Proxy`, bean introspection via reflection | No generated class found for the given interface/bean |
 
-The registry tries `ServiceLoader` first. If no generated implementation is found, it falls back to reflection proxy automatically.
+The annotation processor generates two types of classes:
+- **DAO implementations** (`@DaoApi`) — generated `*$Impl` classes with pre-resolved SQL and method dispatch
+- **Bean metadata** (`@GenerateMeta`) — generated `*Meta` classes with optimized property access (no reflection)
+
+Both are discovered automatically via `ServiceLoader`. If no generated class is found, the library falls back to reflection automatically.
 
 ---
 
@@ -103,7 +107,7 @@ EntityConfig<User> USER = EntityConfig.of(User.class, "users")
 | Created timestamp | *(none)* | `.createdAt("createdat")` |
 | Updated timestamp | *(none)* | `.updatedAt("updatedat")` |
 
-When `createdAt`/`updatedAt` is configured and the value is `null` during insert, the column is omitted from the INSERT statement so the database DEFAULT can apply.
+All columns are always sent in INSERT/UPDATE statements — including timestamps. If you want DB defaults, set the values explicitly in Java before inserting.
 
 ### Column name matching
 
@@ -139,9 +143,9 @@ Methods without `@Query` are recognized by **name prefix** and operate on the en
 | Prefix | Operation | Example signatures |
 |---|---|---|
 | `load` | SELECT * WHERE pk=:id — always returns `T`, throws `NoRowsException` if not found. For `Optional`, use `@Query` | `User loadById(String id)`, `User loadUser(String id)` |
-| `insert` | INSERT INTO ... (always, even with PK set) | `void insert(User u)`, `void insertUser(User u)` |
-| `update` | UPDATE SET ... WHERE pk=:id | `void update(User u)`, `void updateUser(User u)` |
-| `save` | PK is empty (`null` or `0`) → INSERT, otherwise → UPDATE | `void save(User u)`, `void saveUser(User u)` |
+| `insert` | INSERT INTO ... all columns including PK | `void insert(User u)`, `void insertUser(User u)` |
+| `update` | UPDATE SET ... all non-PK columns, WHERE pk=:id | `void update(User u)`, `void updateUser(User u)` |
+| `save` | PK is empty (`null` or `0`) → INSERT without PK (auto-increment), otherwise → UPDATE | `void save(User u)`, `void saveUser(User u)` |
 | `delete` | DELETE WHERE pk=:id (accepts entity or PK value) | `void delete(User u)`, `void deleteById(String id)` |
 
 ```java
