@@ -21,7 +21,7 @@ public final class SqlTemplate {
     private static final Pattern OPTIONAL_BLOCK = Pattern.compile("/\\*\\*(.*?)\\*\\*/", Pattern.DOTALL);
 
     /** Pre-built "?,?,?..." strings for Spread expansion (index = number of values). */
-    private static final String[] SPREAD_PLACEHOLDERS = new String[33];
+    private static final String[] SPREAD_PLACEHOLDERS = new String[130];
     static {
         var sb = new StringBuilder();
         SPREAD_PLACEHOLDERS[0] = "";

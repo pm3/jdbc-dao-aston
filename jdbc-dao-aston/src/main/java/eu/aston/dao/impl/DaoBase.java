@@ -34,7 +34,7 @@ public abstract class DaoBase {
     }
 
     protected <T> void entityInsert(EntityConfig<T> config, T entity) {
-        config.binder().insert(dataSource, objectMapper, entity);
+        config.binder().insertWithPk(dataSource, objectMapper, entity);
     }
 
     protected <T> void entityUpdate(EntityConfig<T> config, T entity) {

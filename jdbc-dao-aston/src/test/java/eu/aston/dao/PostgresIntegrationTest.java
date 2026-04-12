@@ -219,12 +219,12 @@ class PostgresIntegrationTest {
     }
 
     @Test
-    void insertWithNullTimestamp_usesDbDefault() {
+    void insertWithNullTimestamp_storesNull() {
         UserDao dao = DaoRegistry.forClass(UserDao.class, dataSource);
         dao.insertUser(new User("1", "John", "john@test.com", true, null));
 
         User loaded = dao.loadById("1");
-        assertNotNull(loaded.createdat(), "DB should set createdat default");
+        assertNull(loaded.createdat(), "NULL timestamp should be stored as NULL");
     }
 
     @Test
@@ -564,7 +564,7 @@ class PostgresIntegrationTest {
     @Test
     void save_zeroPk_inserts() {
         AuditDao dao = DaoRegistry.forClass(AuditDao.class, dataSource);
-        // save with zero PK triggers insert, DB sequence generates the PK
+        // save with zero PK triggers insert without PK, DB sequence generates the PK
         dao.saveAudit(new AuditLog(0, "CREATE", "created something"));
 
         List<AuditLog> all = dao.findAll();

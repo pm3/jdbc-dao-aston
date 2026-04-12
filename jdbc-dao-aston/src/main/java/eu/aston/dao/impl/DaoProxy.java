@@ -102,7 +102,7 @@ public final class DaoProxy implements InvocationHandler {
         }
         if (name.startsWith("insert")) {
             EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
-            return args -> { config.binder().insert(ds, om, args[0]); return null; };
+            return args -> { config.binder().insertWithPk(ds, om, args[0]); return null; };
         }
         if (name.startsWith("update")) {
             EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);

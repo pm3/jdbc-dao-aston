@@ -24,19 +24,19 @@ public final class EntityBinder<T> {
     /** Per-column metadata, resolved once at init. */
     record ColInfo(String name, JdbcBinder.ParamSetter setter, boolean isPk, boolean isTimestamp) {}
 
-    /** Pre-computed insert variant (SQL + column order) keyed by skip-bitmask. */
-    record InsertVariant(String sql, int[] paramOrder) {}
-
     private final BeanMeta<T> meta;
     private final BeanReader<T> beanReader;
     private final EntityConfig<T> config;
     private final ColInfo[] columns;
 
-    // insert: pre-built variants for each combination of skippable columns
-    private final int[] skippableColIndices; // indices of PK and timestamp columns
-    private final InsertVariant[] insertVariants; // 2^skippable entries, indexed by include-bitmask
+    // insert: all columns including PK
+    private final String insertSql;
 
-    // update: pre-built (fixed shape — always same columns)
+    // insertWithoutPk: all columns except PK (for auto-increment via save)
+    private final String insertWithoutPkSql;
+    private final int[] insertWithoutPkParamOrder;
+
+    // update: fixed shape — all non-PK columns + PK in WHERE
     private final String updateSql;
     private final int[] updateParamOrder; // column indices: non-PK first, PK last
 
@@ -70,26 +70,26 @@ public final class EntityBinder<T> {
         }
         this.pkColIdx = pkIdx;
 
-        // --- INSERT (pre-compute all variants of skippable columns) ---
-        var skipList = new ArrayList<Integer>();
-        for (int i = 0; i < columns.length; i++) {
-            if (columns[i].isPk || columns[i].isTimestamp) skipList.add(i);
+        // --- INSERT (all columns including PK) ---
+        {
+            var colNames = new ArrayList<String>();
+            for (ColInfo col : columns) colNames.add(col.name);
+            this.insertSql = "INSERT INTO " + table + " (" + String.join(", ", colNames)
+                    + ") VALUES (" + String.join(", ", Collections.nCopies(colNames.size(), "?")) + ")";
         }
-        this.skippableColIndices = skipList.stream().mapToInt(Integer::intValue).toArray();
-        int variantCount = 1 << skippableColIndices.length;
-        this.insertVariants = new InsertVariant[variantCount];
-        for (int mask = 0; mask < variantCount; mask++) {
+
+        // --- INSERT without PK (for auto-increment via save) ---
+        {
             var colNames = new ArrayList<String>();
             var order = new ArrayList<Integer>();
             for (int i = 0; i < columns.length; i++) {
-                int skipBit = skipBitFor(i);
-                if (skipBit >= 0 && (mask & (1 << skipBit)) == 0) continue; // skipped
+                if (columns[i].isPk) continue;
                 colNames.add(columns[i].name);
                 order.add(i);
             }
-            String sql = "INSERT INTO " + table + " (" + String.join(", ", colNames)
+            this.insertWithoutPkSql = "INSERT INTO " + table + " (" + String.join(", ", colNames)
                     + ") VALUES (" + String.join(", ", Collections.nCopies(colNames.size(), "?")) + ")";
-            insertVariants[mask] = new InsertVariant(sql, order.stream().mapToInt(Integer::intValue).toArray());
+            this.insertWithoutPkParamOrder = order.stream().mapToInt(Integer::intValue).toArray();
         }
 
         // --- UPDATE (fixed shape: all non-PK columns + PK in WHERE) ---
@@ -112,43 +112,18 @@ public final class EntityBinder<T> {
 
     // --- Runtime operations ---
 
-    public void insert(DataSource ds, ObjectMapper om, T entity) {
-        // Compute include-bitmask for skippable columns
-        int mask = 0;
-        for (int bit = 0; bit < skippableColIndices.length; bit++) {
-            int colIdx = skippableColIndices[bit];
-            ColInfo col = columns[colIdx];
-            Object value = meta.get(entity, col.name);
-            boolean include;
-            if (col.isPk) {
-                include = value != null && !(value instanceof Number n && n.longValue() == 0);
-            } else {
-                include = value != null; // timestamp
-            }
-            if (include) mask |= (1 << bit);
-        }
-
-        InsertVariant variant = insertVariants[mask];
+    public void insertWithPk(DataSource ds, ObjectMapper om, T entity) {
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(variant.sql)) {
-            for (int paramPos = 0; paramPos < variant.paramOrder.length; paramPos++) {
-                int colIdx = variant.paramOrder[paramPos];
-                ColInfo col = columns[colIdx];
+             PreparedStatement ps = conn.prepareStatement(insertSql)) {
+            for (int i = 0; i < columns.length; i++) {
+                ColInfo col = columns[i];
                 Object value = meta.get(entity, col.name);
-                JdbcBinder.setParam(ps, paramPos + 1, value, col.setter, om);
+                JdbcBinder.setParam(ps, i + 1, value, col.setter, om);
             }
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new DaoException("Insert failed: " + variant.sql, e);
+            throw new DaoException("Insert failed: " + insertSql, e);
         }
-    }
-
-    /** Returns the bit position of colIdx in skippableColIndices, or -1 if not skippable. */
-    private int skipBitFor(int colIdx) {
-        for (int bit = 0; bit < skippableColIndices.length; bit++) {
-            if (skippableColIndices[bit] == colIdx) return bit;
-        }
-        return -1;
     }
 
     public void update(DataSource ds, ObjectMapper om, T entity) {
@@ -170,9 +145,24 @@ public final class EntityBinder<T> {
         Object pkValue = pkColIdx >= 0 ? meta.get(entity, columns[pkColIdx].name) : null;
         boolean isEmpty = pkValue == null || (pkValue instanceof Number n && n.longValue() == 0);
         if (isEmpty) {
-            insert(ds, om, entity);
+            insertWithoutPk(ds, om, entity);
         } else {
             update(ds, om, entity);
+        }
+    }
+
+    private void insertWithoutPk(DataSource ds, ObjectMapper om, T entity) {
+        try (Connection conn = ds.getConnection();
+             PreparedStatement ps = conn.prepareStatement(insertWithoutPkSql)) {
+            for (int paramPos = 0; paramPos < insertWithoutPkParamOrder.length; paramPos++) {
+                int colIdx = insertWithoutPkParamOrder[paramPos];
+                ColInfo col = columns[colIdx];
+                Object value = meta.get(entity, col.name);
+                JdbcBinder.setParam(ps, paramPos + 1, value, col.setter, om);
+            }
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Insert failed: " + insertWithoutPkSql, e);
         }
     }
 
