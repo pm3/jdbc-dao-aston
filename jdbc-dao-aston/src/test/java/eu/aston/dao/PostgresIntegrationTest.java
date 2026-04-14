@@ -62,8 +62,6 @@ class PostgresIntegrationTest {
 
         void deleteUser(User user);
 
-        void deleteById(String id);
-
         @Query("SELECT * FROM users WHERE email=:email")
         Optional<User> findByEmail(String email);
 
@@ -251,15 +249,6 @@ class PostgresIntegrationTest {
         UserDao dao = DaoRegistry.forClass(UserDao.class, dataSource);
         dao.insertUser(new User("1", "John", "john@test.com", true, null));
         dao.deleteUser(new User("1", null, null, false, null));
-
-        assertThrows(NoRowsException.class, () -> dao.loadById("1"));
-    }
-
-    @Test
-    void deleteByPk() {
-        UserDao dao = DaoRegistry.forClass(UserDao.class, dataSource);
-        dao.insertUser(new User("1", "John", "john@test.com", true, null));
-        dao.deleteById("1");
 
         assertThrows(NoRowsException.class, () -> dao.loadById("1"));
     }

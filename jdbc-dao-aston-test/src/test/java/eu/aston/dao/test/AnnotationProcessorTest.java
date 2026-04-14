@@ -208,8 +208,9 @@ class AnnotationProcessorTest {
     @Test
     void generatedDao_delete() {
         TestUserDao dao = DaoRegistry.forClass(TestUserDao.class, dataSource);
-        dao.insertUser(new TestUser("1", "John", "john@test.com", true, null));
-        dao.deleteById("1");
+        TestUser user = new TestUser("1", "John", "john@test.com", true, null);
+        dao.insertUser(user);
+        dao.deleteUser(user);
 
         assertThrows(NoRowsException.class, () -> dao.loadById("1"));
     }

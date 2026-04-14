@@ -170,13 +170,8 @@ public final class EntityBinder<T> {
         }
     }
 
-    public void delete(DataSource ds, ObjectMapper om, Object entityOrPk) {
-        Object pkValue;
-        if (config.type().isInstance(entityOrPk)) {
-            pkValue = meta.get(config.type().cast(entityOrPk), columns[pkColIdx].name);
-        } else {
-            pkValue = entityOrPk;
-        }
+    public void delete(DataSource ds, ObjectMapper om, T entity) {
+        Object pkValue = meta.get(entity, columns[pkColIdx].name);
         try (Connection conn = ds.getConnection();
                 PreparedStatement ps = conn.prepareStatement(deleteSql)) {
             JdbcBinder.setParam(ps, 1, pkValue, columns[pkColIdx].setter, om);

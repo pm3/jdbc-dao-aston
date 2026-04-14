@@ -271,7 +271,7 @@ public class DaoApiProcessor extends AbstractProcessor {
         } else if (name.startsWith("delete")) {
             if (method.params.size() == 1) {
                 String paramTypeRaw = toRawTypeString(method.params.get(0).type);
-                String configField = findConfigFieldOrFirst(configs, paramTypeRaw);
+                String configField = findConfigField(configs, paramTypeRaw);
                 bw.write("        entityDelete(" + ifaceName + "." + configField + ", " + method.params.get(0).name
                         + ");\n");
             }
@@ -354,16 +354,6 @@ public class DaoApiProcessor extends AbstractProcessor {
             if (c.entityType.equals(entityType))
                 return c.fieldName;
         }
-        throw new RuntimeException("No EntityConfig found for type: " + entityType);
-    }
-
-    private String findConfigFieldOrFirst(List<EntityConfigInfo> configs, String entityType) {
-        for (EntityConfigInfo c : configs) {
-            if (c.entityType.equals(entityType))
-                return c.fieldName;
-        }
-        if (configs.size() == 1)
-            return configs.get(0).fieldName;
         throw new RuntimeException("No EntityConfig found for type: " + entityType);
     }
 

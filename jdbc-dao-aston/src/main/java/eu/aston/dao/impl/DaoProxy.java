@@ -126,7 +126,7 @@ public final class DaoProxy implements InvocationHandler {
             };
         }
         if (name.startsWith("delete")) {
-            EntityConfig config = resolveDeleteConfig(entityConfigs, method);
+            EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
             return args -> {
                 config.binder().delete(ds, om, args[0]);
                 return null;
@@ -137,18 +137,6 @@ public final class DaoProxy implements InvocationHandler {
     }
 
     // --- Helpers ---
-
-    @SuppressWarnings("rawtypes")
-    private static EntityConfig resolveDeleteConfig(Map<Class<?>, EntityConfig<?>> entityConfigs, Method method) {
-        if (method.getParameterTypes().length == 1) {
-            EntityConfig<?> config = entityConfigs.get(method.getParameterTypes()[0]);
-            if (config != null)
-                return config;
-            if (entityConfigs.size() == 1)
-                return entityConfigs.values().iterator().next();
-        }
-        throw new DaoException("Cannot resolve delete entity for method: " + method.getName());
-    }
 
     private static EntityConfig<?> findConfig(Map<Class<?>, EntityConfig<?>> entityConfigs, Class<?> beanType) {
         EntityConfig<?> config = entityConfigs.get(beanType);

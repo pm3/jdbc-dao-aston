@@ -146,7 +146,7 @@ Methods without `@Query` are recognized by **name prefix** and operate on the en
 | `insert` | INSERT INTO ... all columns including PK | `void insert(User u)`, `void insertUser(User u)` |
 | `update` | UPDATE SET ... all non-PK columns, WHERE pk=:id | `void update(User u)`, `void updateUser(User u)` |
 | `save` | PK is empty (`null` or `0`) → INSERT without PK (auto-increment), otherwise → UPDATE | `void save(User u)`, `void saveUser(User u)` |
-| `delete` | DELETE WHERE pk=:id (accepts entity or PK value) | `void delete(User u)`, `void deleteById(String id)` |
+| `delete` | DELETE WHERE pk=:id (reads PK from entity) | `void delete(User u)`, `void deleteUser(User u)` |
 
 ```java
 @DaoApi
@@ -164,8 +164,7 @@ public interface UserDao {
 
     void updateUser(User user);            // update USER
 
-    void deleteUser(User user);            // delete from USER
-    void deleteById(String id);            // delete from USER by PK
+    void deleteUser(User user);            // delete from USER (by PK read from entity)
 }
 ```
 

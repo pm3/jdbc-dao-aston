@@ -18,7 +18,7 @@ public interface TestUserDao {
 
     void updateUser(TestUser user);
 
-    void deleteById(String id);
+    void deleteUser(TestUser user);
 
     @Query("SELECT * FROM users WHERE email=:email")
     Optional<TestUser> findByEmail(String email);

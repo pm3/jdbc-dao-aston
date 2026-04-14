@@ -46,8 +46,8 @@ public abstract class DaoBase {
         config.binder().save(dataSource, objectMapper, entity);
     }
 
-    protected <T> void entityDelete(EntityConfig<T> config, Object entityOrPk) {
-        config.binder().delete(dataSource, objectMapper, entityOrPk);
+    protected <T> void entityDelete(EntityConfig<T> config, T entity) {
+        config.binder().delete(dataSource, objectMapper, entity);
     }
 
     // --- Query operations ---
