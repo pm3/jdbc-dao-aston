@@ -106,8 +106,9 @@ public final class SqlHelper {
         var params = parsed.params();
         var setters = parsed.setters();
         for (int i = 0; i < params.size(); i++) {
-            if (setters != null) {
-                JdbcBinder.setParam(ps, i + 1, params.get(i), setters[i], om);
+            JdbcBinder.ParamSetter setter = setters.get(i);
+            if (setter != null) {
+                JdbcBinder.setParam(ps, i + 1, params.get(i), setter, om);
             } else {
                 JdbcBinder.setParam(ps, i + 1, params.get(i), om);
             }
