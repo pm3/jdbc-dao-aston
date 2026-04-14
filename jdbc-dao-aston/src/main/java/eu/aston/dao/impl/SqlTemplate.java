@@ -208,8 +208,9 @@ public final class SqlTemplate {
                     : String.join(",", Collections.nCopies(size, "?")));
             positionalParams.addAll(spread.values());
         } else if (value instanceof ICondition cond) {
-            sb.append(cond.sql().isEmpty() ? "1=1" : cond.sql());
-            positionalParams.addAll(cond.params());
+            if (!cond.build(sb, positionalParams)) {
+                sb.append("1=1");
+            }
         } else {
             sb.append('?');
             positionalParams.add(value);

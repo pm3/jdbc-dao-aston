@@ -14,6 +14,12 @@
     <name>${project.groupId}:${project.artifactId}</name>
     <description>Tests for annotation processor compile-time generation</description>
 
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.install.skip>true</maven.install.skip>
+        <central.publishing.skipPublishing>true</central.publishing.skipPublishing>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>eu.aston</groupId>

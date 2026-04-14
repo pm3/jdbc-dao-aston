@@ -236,16 +236,27 @@ class DaoProxyTest {
 
     // --- Condition tests ---
 
+    private static String buildSql(ICondition cond) {
+        var sb = new StringBuilder();
+        cond.build(sb, new java.util.ArrayList<>());
+        return sb.toString();
+    }
+
+    private static List<Object> buildParams(ICondition cond) {
+        var p = new java.util.ArrayList<Object>();
+        cond.build(new StringBuilder(), p);
+        return p;
+    }
+
     @Test
     void conditionDynamic() {
-        // Test Condition builder API
         ICondition cond = Condition.and(
                 Condition.eq("active", true),
                 Condition.like("name", null),   // skipped
                 Condition.gt("age", 18)
         );
-        assertEquals("(active = ? AND age > ?)", cond.sql());
-        assertEquals(List.of(true, 18), cond.params());
+        assertEquals("(active = ? AND age > ?)", buildSql(cond));
+        assertEquals(List.of(true, 18), buildParams(cond));
     }
 
     @Test
@@ -254,22 +265,22 @@ class DaoProxyTest {
                 Condition.eq("a", null),
                 Condition.like("b", null)
         );
-        assertEquals("", cond.sql());
-        assertEquals(List.of(), cond.params());
+        assertEquals("", buildSql(cond));
+        assertEquals(List.of(), buildParams(cond));
     }
 
     @Test
     void conditionIn() {
         ICondition cond = Condition.in("id", List.of(1, 2, 3));
-        assertEquals("id IN (?,?,?)", cond.sql());
-        assertEquals(List.of(1, 2, 3), cond.params());
+        assertEquals("id IN (?,?,?)", buildSql(cond));
+        assertEquals(List.of(1, 2, 3), buildParams(cond));
     }
 
     @Test
     void conditionBetween() {
         ICondition cond = Condition.between("age", 18, 65);
-        assertEquals("age BETWEEN ? AND ?", cond.sql());
-        assertEquals(List.of(18, 65), cond.params());
+        assertEquals("age BETWEEN ? AND ?", buildSql(cond));
+        assertEquals(List.of(18, 65), buildParams(cond));
     }
 
     @Test
@@ -278,15 +289,15 @@ class DaoProxyTest {
                 Condition.eq("status", "active"),
                 Condition.eq("status", "pending")
         );
-        assertEquals("(status = ? OR status = ?)", cond.sql());
-        assertEquals(List.of("active", "pending"), cond.params());
+        assertEquals("(status = ? OR status = ?)", buildSql(cond));
+        assertEquals(List.of("active", "pending"), buildParams(cond));
     }
 
     @Test
     void conditionNot() {
         ICondition cond = Condition.not(Condition.eq("deleted", true));
-        assertEquals("NOT (deleted = ?)", cond.sql());
-        assertEquals(List.of(true), cond.params());
+        assertEquals("NOT (deleted = ?)", buildSql(cond));
+        assertEquals(List.of(true), buildParams(cond));
     }
 
     // --- Spread tests ---

@@ -2,9 +2,7 @@ package eu.aston.dao;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.StringJoiner;
 
 /**
  * Builder for dynamic SQL WHERE conditions.
@@ -12,103 +10,154 @@ import java.util.StringJoiner;
  */
 public final class Condition {
 
+    private static final ICondition EMPTY = (sql, params) -> false;
+
     private Condition() {}
 
     public static ICondition eq(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " = ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " = ?", value);
     }
 
     public static ICondition ne(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " != ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " != ?", value);
     }
 
     public static ICondition lt(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " < ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " < ?", value);
     }
 
     public static ICondition le(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " <= ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " <= ?", value);
     }
 
     public static ICondition gt(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " > ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " > ?", value);
     }
 
     public static ICondition ge(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " >= ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " >= ?", value);
     }
 
     public static ICondition like(String column, Object value) {
-        if (value == null) return empty();
-        return simple(column + " LIKE ?", value);
+        return value == null ? EMPTY : new BinaryCondition(column, " LIKE ?", value);
     }
 
     public static ICondition in(String column, Collection<?> values) {
-        if (values == null || values.isEmpty()) return empty();
-        var placeholders = String.join(",", Collections.nCopies(values.size(), "?"));
-        return new SimpleCondition(column + " IN (" + placeholders + ")", new ArrayList<>(values));
+        if (values == null || values.isEmpty()) return EMPTY;
+        return new InCondition(column, new ArrayList<>(values));
     }
 
     public static ICondition isNull(String column) {
-        return new SimpleCondition(column + " IS NULL", List.of());
+        return new RawCondition(column + " IS NULL", List.of());
     }
 
     public static ICondition isNotNull(String column) {
-        return new SimpleCondition(column + " IS NOT NULL", List.of());
+        return new RawCondition(column + " IS NOT NULL", List.of());
     }
 
     public static ICondition between(String column, Object from, Object to) {
-        if (from == null || to == null) return empty();
-        return new SimpleCondition(column + " BETWEEN ? AND ?", List.of(from, to));
+        if (from == null && to == null) return EMPTY;
+        if (from == null) return new BinaryCondition(column, " < ?", to);
+        if (to == null) return new BinaryCondition(column, " > ?", from);
+        return new BetweenCondition(column, from, to);
     }
 
     public static ICondition raw(String sql, Object... params) {
-        return new SimpleCondition(sql, params == null ? List.of() : List.of(params));
+        if (sql == null || sql.isEmpty()) return EMPTY;
+        return new RawCondition(sql, params == null ? List.of() : List.of(params));
     }
 
     public static ICondition and(ICondition... conditions) {
-        return composite("AND", conditions);
+        return composite(" AND ", conditions);
     }
 
     public static ICondition or(ICondition... conditions) {
-        return composite("OR", conditions);
+        return composite(" OR ", conditions);
     }
 
     public static ICondition not(ICondition condition) {
-        if (condition == null || condition.sql().isEmpty()) return empty();
-        var params = new ArrayList<>(condition.params());
-        return new SimpleCondition("NOT (" + condition.sql() + ")", params);
+        return condition == null ? EMPTY : new NotCondition(condition);
     }
 
-    private static ICondition composite(String op, ICondition[] conditions) {
-        var parts = new ArrayList<ICondition>();
-        for (ICondition c : conditions) {
-            if (c != null && !c.sql().isEmpty()) parts.add(c);
+    private static ICondition composite(String separator, ICondition[] conditions) {
+        if (conditions == null || conditions.length == 0) return EMPTY;
+        if (conditions.length == 1) return conditions[0] == null ? EMPTY : conditions[0];
+        return new CompositeCondition(separator, conditions);
+    }
+
+    private record BinaryCondition(String column, String op, Object value) implements ICondition {
+        @Override public boolean build(StringBuilder sql, List<Object> params) {
+            sql.append(column).append(op);
+            params.add(value);
+            return true;
         }
-        if (parts.isEmpty()) return empty();
-        if (parts.size() == 1) return parts.get(0);
-        var sj = new StringJoiner(" " + op + " ", "(", ")");
-        var allParams = new ArrayList<Object>();
-        for (ICondition c : parts) {
-            sj.add(c.sql());
-            allParams.addAll(c.params());
+    }
+
+    private record InCondition(String column, List<Object> values) implements ICondition {
+        @Override public boolean build(StringBuilder sql, List<Object> params) {
+            sql.append(column).append(" IN (");
+            int n = values.size();
+            for (int i = 0; i < n; i++) {
+                if (i > 0) sql.append(',');
+                sql.append('?');
+            }
+            sql.append(')');
+            params.addAll(values);
+            return true;
         }
-        return new SimpleCondition(sj.toString(), allParams);
     }
 
-    private static ICondition simple(String sql, Object value) {
-        return new SimpleCondition(sql, List.of(value));
+    private record BetweenCondition(String column, Object from, Object to) implements ICondition {
+        @Override public boolean build(StringBuilder sql, List<Object> params) {
+            sql.append(column).append(" BETWEEN ? AND ?");
+            params.add(from);
+            params.add(to);
+            return true;
+        }
     }
 
-    private static ICondition empty() {
-        return new SimpleCondition("", List.of());
+    private record RawCondition(String sql, List<Object> values) implements ICondition {
+        @Override public boolean build(StringBuilder out, List<Object> params) {
+            out.append(sql);
+            params.addAll(values);
+            return true;
+        }
     }
 
-    private record SimpleCondition(String sql, List<Object> params) implements ICondition {}
+    private record CompositeCondition(String separator, ICondition[] parts) implements ICondition {
+        @Override public boolean build(StringBuilder sql, List<Object> params) {
+            int startLen = sql.length();
+            sql.append('(');
+            boolean any = false;
+            for (ICondition c : parts) {
+                if (c == null) continue;
+                int beforeLen = sql.length();
+                if (any) sql.append(separator);
+                if (c.build(sql, params)) {
+                    any = true;
+                } else {
+                    sql.setLength(beforeLen);
+                }
+            }
+            if (!any) {
+                sql.setLength(startLen);
+                return false;
+            }
+            sql.append(')');
+            return true;
+        }
+    }
+
+    private record NotCondition(ICondition inner) implements ICondition {
+        @Override public boolean build(StringBuilder sql, List<Object> params) {
+            int startLen = sql.length();
+            sql.append("NOT (");
+            if (!inner.build(sql, params)) {
+                sql.setLength(startLen);
+                return false;
+            }
+            sql.append(')');
+            return true;
+        }
+    }
 }
