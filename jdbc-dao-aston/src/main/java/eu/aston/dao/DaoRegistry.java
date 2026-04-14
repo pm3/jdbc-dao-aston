@@ -10,15 +10,16 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Central registry for DAO instances.
- * Tries ServiceLoader first (compile-time generated), falls back to reflection proxy.
+ * Central registry for DAO instances. Tries ServiceLoader first (compile-time generated), falls back to reflection
+ * proxy.
  */
 public final class DaoRegistry {
 
     private static final Map<Class<?>, DaoProvider> PROVIDERS = new ConcurrentHashMap<>();
     private static volatile boolean serviceLoaderInitialized = false;
 
-    private DaoRegistry() {}
+    private DaoRegistry() {
+    }
 
     /**
      * Create a DAO instance without JSON support.
@@ -41,17 +42,15 @@ public final class DaoRegistry {
 
         // Reflection fallback
         var handler = new DaoProxy(daoInterface, dataSource, objectMapper);
-        return (T) Proxy.newProxyInstance(
-                daoInterface.getClassLoader(),
-                new Class<?>[]{daoInterface},
-                handler
-        );
+        return (T) Proxy.newProxyInstance(daoInterface.getClassLoader(), new Class<?>[] { daoInterface }, handler);
     }
 
     private static void ensureServiceLoaderInitialized() {
-        if (serviceLoaderInitialized) return;
+        if (serviceLoaderInitialized)
+            return;
         synchronized (DaoRegistry.class) {
-            if (serviceLoaderInitialized) return;
+            if (serviceLoaderInitialized)
+                return;
             ServiceLoader<DaoProvider> loader = ServiceLoader.load(DaoProvider.class);
             for (DaoProvider provider : loader) {
                 PROVIDERS.put(provider.daoInterface(), provider);

@@ -10,8 +10,7 @@ import java.util.Optional;
 @DaoApi
 public interface TestUserDao {
 
-    EntityConfig<TestUser> USER = EntityConfig.of(TestUser.class, "users")
-            .createdAt("createdat").build();
+    EntityConfig<TestUser> USER = EntityConfig.of(TestUser.class, "users").createdAt("createdat").build();
 
     TestUser loadById(String id);
 

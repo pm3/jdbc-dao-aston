@@ -6,7 +6,8 @@ import java.util.List;
 /**
  * Unified introspection API for beans and records.
  *
- * @param <T> the bean/record type
+ * @param <T>
+ *            the bean/record type
  */
 public interface BeanMeta<T> {
 

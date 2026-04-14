@@ -19,16 +19,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Cached bean reader — column templates and result mapping for any bean/record/DTO.
- * Cached per Class, reusable across queries.
+ * Cached bean reader — column templates and result mapping for any bean/record/DTO. Cached per Class, reusable across
+ * queries.
  */
 public final class BeanReader<T> {
 
     private static final ConcurrentHashMap<Class<?>, BeanReader<?>> cache = new ConcurrentHashMap<>();
 
     /** Column binding: colIndex + beanIndex + reader. genericType for JSON columns (reader==null). */
-    record BoundColumn(int colIndex, int beanIndex, JdbcBinder.ColumnReader reader,
-                       Type genericType, AtomicReference<JavaType> cachedJavaType) {}
+    record BoundColumn(int colIndex, int beanIndex, JdbcBinder.ColumnReader reader, Type genericType,
+            AtomicReference<JavaType> cachedJavaType) {
+    }
 
     private final BeanMeta<T> meta;
     private final int propCount;
@@ -88,13 +89,16 @@ public final class BeanReader<T> {
                 Object[] values = new Object[propCount];
                 for (int i = 0; i < propCount; i++) {
                     BoundColumn bc = bindings[i];
-                    if (bc == null) continue;
+                    if (bc == null)
+                        continue;
                     if (bc.reader != null) {
                         values[i] = bc.reader.read(rs, bc.colIndex);
                     } else {
                         String json = rs.getString(bc.colIndex);
                         if (json != null) {
-                            if (om == null) throw new DaoException("ObjectMapper required for JSON column at index " + bc.beanIndex);
+                            if (om == null)
+                                throw new DaoException(
+                                        "ObjectMapper required for JSON column at index " + bc.beanIndex);
                             try {
                                 JavaType javaType = bc.cachedJavaType.get();
                                 if (javaType == null) {

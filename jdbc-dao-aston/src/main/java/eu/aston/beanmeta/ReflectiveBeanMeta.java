@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Reflection-based implementation of {@link BeanMeta}.
- * Supports records and JavaBeans (getter/setter or getter + all-args constructor).
+ * Reflection-based implementation of {@link BeanMeta}. Supports records and JavaBeans (getter/setter or getter +
+ * all-args constructor).
  */
 final class ReflectiveBeanMeta<T> implements BeanMeta<T> {
 
@@ -75,8 +75,10 @@ final class ReflectiveBeanMeta<T> implements BeanMeta<T> {
             var setterMap = new LinkedHashMap<String, MethodHandle>();
 
             for (Method m : type.getMethods()) {
-                if (m.getDeclaringClass() == Object.class) continue;
-                if (m.getParameterCount() != 0) continue;
+                if (m.getDeclaringClass() == Object.class)
+                    continue;
+                if (m.getParameterCount() != 0)
+                    continue;
 
                 String name = null;
                 if (m.getName().startsWith("get") && m.getName().length() > 3) {
@@ -86,7 +88,8 @@ final class ReflectiveBeanMeta<T> implements BeanMeta<T> {
                     name = Character.toLowerCase(m.getName().charAt(2)) + m.getName().substring(3);
                 }
 
-                if (name == null || "class".equals(name)) continue;
+                if (name == null || "class".equals(name))
+                    continue;
 
                 nameList.add(name);
                 typeList.add(m.getReturnType());

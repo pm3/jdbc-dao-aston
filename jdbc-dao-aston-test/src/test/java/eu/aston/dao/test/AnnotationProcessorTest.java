@@ -21,8 +21,8 @@ import java.util.ServiceLoader;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests that annotation processors generated correct code at compile time.
- * Verifies both BeanMetaProcessor (@GenerateMeta) and DaoApiProcessor (@DaoApi).
+ * Tests that annotation processors generated correct code at compile time. Verifies both BeanMetaProcessor
+ * (@GenerateMeta) and DaoApiProcessor (@DaoApi).
  */
 class AnnotationProcessorTest {
 
@@ -36,22 +36,14 @@ class AnnotationProcessorTest {
         dataSource = ds;
 
         try (Connection conn = dataSource.getConnection();
-             Statement st = conn.createStatement()) {
+                Statement st = conn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS users");
-            st.execute("CREATE TABLE users ("
-                    + "id VARCHAR(50) PRIMARY KEY, "
-                    + "name VARCHAR(100), "
-                    + "email VARCHAR(100), "
-                    + "active BOOLEAN DEFAULT true, "
-                    + "createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-                    + ")");
+            st.execute("CREATE TABLE users (" + "id VARCHAR(50) PRIMARY KEY, " + "name VARCHAR(100), "
+                    + "email VARCHAR(100), " + "active BOOLEAN DEFAULT true, "
+                    + "createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP" + ")");
             st.execute("DROP TABLE IF EXISTS products");
-            st.execute("CREATE TABLE products ("
-                    + "id VARCHAR(50) PRIMARY KEY, "
-                    + "name VARCHAR(100), "
-                    + "price DOUBLE, "
-                    + "attrs VARCHAR(4000)"
-                    + ")");
+            st.execute("CREATE TABLE products (" + "id VARCHAR(50) PRIMARY KEY, " + "name VARCHAR(100), "
+                    + "price DOUBLE, " + "attrs VARCHAR(4000)" + ")");
         }
     }
 
@@ -92,8 +84,7 @@ class AnnotationProcessorTest {
     @Test
     void generatedBeanMeta_types() {
         BeanMeta<TestUser> meta = BeanMetaRegistry.forClass(TestUser.class);
-        assertEquals(List.of(String.class, String.class, String.class, boolean.class, Instant.class),
-                meta.types());
+        assertEquals(List.of(String.class, String.class, String.class, boolean.class, Instant.class), meta.types());
     }
 
     @Test
@@ -137,7 +128,8 @@ class AnnotationProcessorTest {
     /**
      * Non-annotated record for reflection comparison.
      */
-    public record PlainUser(String id, String name, String email, boolean active, Instant createdat) {}
+    public record PlainUser(String id, String name, String email, boolean active, Instant createdat) {
+    }
 
     @Test
     void generatedVsReflection_sameNames() {
@@ -279,10 +271,10 @@ class AnnotationProcessorTest {
      * Non-annotated DAO for proxy comparison.
      */
     public interface PlainUserDao {
-        EntityConfig<TestUser> USER = EntityConfig.of(TestUser.class, "users")
-                .updatedAt("").build();
+        EntityConfig<TestUser> USER = EntityConfig.of(TestUser.class, "users").updatedAt("").build();
 
         TestUser loadById(String id);
+
         void insertUser(TestUser user);
 
         @eu.aston.dao.Query("SELECT * FROM users")
@@ -301,8 +293,7 @@ class AnnotationProcessorTest {
 
         assertFalse(java.lang.reflect.Proxy.isProxyClass(generated.getClass()),
                 "TestUserDao should use generated impl");
-        assertTrue(java.lang.reflect.Proxy.isProxyClass(proxy.getClass()),
-                "PlainUserDao should use reflection proxy");
+        assertTrue(java.lang.reflect.Proxy.isProxyClass(proxy.getClass()), "PlainUserDao should use reflection proxy");
 
         // Both should produce same results
         generated.insertUser(new TestUser("1", "John", "john@test.com", true, null));

@@ -18,7 +18,8 @@ class ReflectiveBeanMetaTest {
 
     // --- Record tests ---
 
-    public record PersonRecord(String name, int age, List<String> tags) {}
+    public record PersonRecord(String name, int age, List<String> tags) {
+    }
 
     @Test
     void recordMeta_type() {
@@ -83,12 +84,24 @@ class ReflectiveBeanMetaTest {
         private String street;
         private String city;
 
-        public AddressBean() {}
+        public AddressBean() {
+        }
 
-        public String getStreet() { return street; }
-        public void setStreet(String street) { this.street = street; }
-        public String getCity() { return city; }
-        public void setCity(String city) { this.city = city; }
+        public String getStreet() {
+            return street;
+        }
+
+        public void setStreet(String street) {
+            this.street = street;
+        }
+
+        public String getCity() {
+            return city;
+        }
+
+        public void setCity(String city) {
+            this.city = city;
+        }
     }
 
     @Test
@@ -131,15 +144,15 @@ class ReflectiveBeanMetaTest {
 
     @Test
     void parameterizedTypeImpl_equality() {
-        var pt1 = new ParameterizedTypeImpl(List.class, new Type[]{String.class});
-        var pt2 = new ParameterizedTypeImpl(List.class, new Type[]{String.class});
+        var pt1 = new ParameterizedTypeImpl(List.class, new Type[] { String.class });
+        var pt2 = new ParameterizedTypeImpl(List.class, new Type[] { String.class });
         assertEquals(pt1, pt2);
         assertEquals(pt1.hashCode(), pt2.hashCode());
     }
 
     @Test
     void parameterizedTypeImpl_toString() {
-        var pt = new ParameterizedTypeImpl(List.class, new Type[]{String.class});
+        var pt = new ParameterizedTypeImpl(List.class, new Type[] { String.class });
         assertEquals("java.util.List<java.lang.String>", pt.toString());
     }
 

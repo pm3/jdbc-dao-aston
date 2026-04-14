@@ -77,7 +77,7 @@ public class BeanMetaProcessor extends AbstractProcessor {
         JavaFileObject sourceFile = filer.createSourceFile(qualifiedMetaName, typeElement);
 
         try (Writer writer = sourceFile.openWriter();
-             BufferedWriter bw = new BufferedWriter(writer)) {
+                BufferedWriter bw = new BufferedWriter(writer)) {
             generateSource(bw, packageName, simpleName, metaClassName, qualifiedTypeName, properties, isRecord);
         }
 
@@ -87,10 +87,13 @@ public class BeanMetaProcessor extends AbstractProcessor {
     private List<PropertyInfo> extractRecordProperties(TypeElement typeElement) {
         var properties = new ArrayList<PropertyInfo>();
         for (RecordComponentElement rc : typeElement.getRecordComponents()) {
-            properties.add(new PropertyInfo(
-                    rc.getSimpleName().toString(),
-                    rc.asType(),
-                    rc.getSimpleName().toString() // accessor name = component name for records
+            properties.add(new PropertyInfo(rc.getSimpleName().toString(), rc.asType(), rc.getSimpleName().toString() // accessor
+                                                                                                                      // name
+                                                                                                                      // =
+                                                                                                                      // component
+                                                                                                                      // name
+                                                                                                                      // for
+                                                                                                                      // records
             ));
         }
         return properties;
@@ -99,10 +102,13 @@ public class BeanMetaProcessor extends AbstractProcessor {
     private List<PropertyInfo> extractBeanProperties(TypeElement typeElement) {
         var properties = new ArrayList<PropertyInfo>();
         for (Element enclosed : typeElement.getEnclosedElements()) {
-            if (enclosed.getKind() != ElementKind.METHOD) continue;
+            if (enclosed.getKind() != ElementKind.METHOD)
+                continue;
             ExecutableElement method = (ExecutableElement) enclosed;
-            if (method.getModifiers().contains(Modifier.STATIC)) continue;
-            if (!method.getParameters().isEmpty()) continue;
+            if (method.getModifiers().contains(Modifier.STATIC))
+                continue;
+            if (!method.getParameters().isEmpty())
+                continue;
 
             String methodName = method.getSimpleName().toString();
             String propName = null;
@@ -125,11 +131,15 @@ public class BeanMetaProcessor extends AbstractProcessor {
             TypeElement superElement = (TypeElement) ((DeclaredType) superclass).asElement();
             if (!superElement.getQualifiedName().toString().equals("java.lang.Object")) {
                 for (Element enclosed : superElement.getEnclosedElements()) {
-                    if (enclosed.getKind() != ElementKind.METHOD) continue;
+                    if (enclosed.getKind() != ElementKind.METHOD)
+                        continue;
                     ExecutableElement method = (ExecutableElement) enclosed;
-                    if (method.getModifiers().contains(Modifier.STATIC)) continue;
-                    if (!method.getModifiers().contains(Modifier.PUBLIC)) continue;
-                    if (!method.getParameters().isEmpty()) continue;
+                    if (method.getModifiers().contains(Modifier.STATIC))
+                        continue;
+                    if (!method.getModifiers().contains(Modifier.PUBLIC))
+                        continue;
+                    if (!method.getParameters().isEmpty())
+                        continue;
 
                     String methodName = method.getSimpleName().toString();
                     String propName = null;
@@ -144,8 +154,7 @@ public class BeanMetaProcessor extends AbstractProcessor {
                     if (propName != null && !"class".equals(propName)) {
                         // only add if not already present
                         String finalPropName = propName;
-                        boolean alreadyPresent = properties.stream()
-                                .anyMatch(p -> p.name.equals(finalPropName));
+                        boolean alreadyPresent = properties.stream().anyMatch(p -> p.name.equals(finalPropName));
                         if (!alreadyPresent) {
                             properties.add(new PropertyInfo(propName, method.getReturnType(), methodName));
                         }
@@ -156,9 +165,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
         return properties;
     }
 
-    private void generateSource(BufferedWriter bw, String packageName, String simpleName,
-                                String metaClassName, String qualifiedTypeName,
-                                List<PropertyInfo> properties, boolean isRecord) throws IOException {
+    private void generateSource(BufferedWriter bw, String packageName, String simpleName, String metaClassName,
+            String qualifiedTypeName, List<PropertyInfo> properties, boolean isRecord) throws IOException {
         if (!packageName.isEmpty()) {
             bw.write("package " + packageName + ";\n\n");
         }
@@ -217,7 +225,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
                 PropertyInfo prop = properties.get(i);
                 String cast = getCastExpression(prop.type, "values[" + i + "]");
                 bw.write("            " + cast);
-                if (i < properties.size() - 1) bw.write(",");
+                if (i < properties.size() - 1)
+                    bw.write(",");
                 bw.write("\n");
             }
             bw.write("        );\n");
@@ -229,7 +238,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
                 PropertyInfo prop = properties.get(i);
                 String cast = getCastExpression(prop.type, "values[" + i + "]");
                 bw.write("            " + cast);
-                if (i < properties.size() - 1) bw.write(",");
+                if (i < properties.size() - 1)
+                    bw.write(",");
                 bw.write("\n");
             }
             bw.write("        );\n");
@@ -242,7 +252,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
     private String joinQuoted(List<PropertyInfo> properties) {
         var sb = new StringBuilder();
         for (int i = 0; i < properties.size(); i++) {
-            if (i > 0) sb.append(", ");
+            if (i > 0)
+                sb.append(", ");
             sb.append("\"").append(properties.get(i).name).append("\"");
         }
         return sb.toString();
@@ -251,7 +262,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
     private String joinRawTypes(List<PropertyInfo> properties) {
         var sb = new StringBuilder();
         for (int i = 0; i < properties.size(); i++) {
-            if (i > 0) sb.append(", ");
+            if (i > 0)
+                sb.append(", ");
             sb.append(toRawTypeString(properties.get(i).type)).append(".class");
         }
         return sb.toString();
@@ -260,7 +272,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
     private String joinGenericTypes(List<PropertyInfo> properties) {
         var sb = new StringBuilder();
         for (int i = 0; i < properties.size(); i++) {
-            if (i > 0) sb.append(",\n            ");
+            if (i > 0)
+                sb.append(",\n            ");
             sb.append(toGenericTypeExpression(properties.get(i).type));
         }
         return sb.toString();
@@ -291,7 +304,8 @@ public class BeanMetaProcessor extends AbstractProcessor {
             var sb = new StringBuilder();
             sb.append("new ParameterizedTypeImpl(").append(rawName).append(".class, new Type[]{");
             for (int i = 0; i < typeArgs.size(); i++) {
-                if (i > 0) sb.append(", ");
+                if (i > 0)
+                    sb.append(", ");
                 sb.append(toGenericTypeExpression(typeArgs.get(i)));
             }
             sb.append("})");
@@ -342,8 +356,7 @@ public class BeanMetaProcessor extends AbstractProcessor {
 
     private void writeServiceFile() {
         try {
-            FileObject resource = processingEnv.getFiler().createResource(
-                    StandardLocation.CLASS_OUTPUT, "",
+            FileObject resource = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "",
                     "META-INF/services/eu.aston.beanmeta.BeanMeta");
             try (Writer writer = resource.openWriter()) {
                 for (String entry : generatedServiceEntries) {
@@ -356,5 +369,6 @@ public class BeanMetaProcessor extends AbstractProcessor {
         }
     }
 
-    private record PropertyInfo(String name, TypeMirror type, String accessorName) {}
+    private record PropertyInfo(String name, TypeMirror type, String accessorName) {
+    }
 }

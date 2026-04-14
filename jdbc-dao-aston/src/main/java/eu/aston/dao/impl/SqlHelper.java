@@ -20,32 +20,37 @@ import java.util.Optional;
  */
 public final class SqlHelper {
 
-    private SqlHelper() {}
+    private SqlHelper() {
+    }
 
     // --- Query execution ---
 
-    static <T> T queryOne(DataSource ds, ObjectMapper om, Class<T> type,
-                          String sqlTemplate, Map<String, QueryParam> paramDefs, Object[] args) {
+    static <T> T queryOne(DataSource ds, ObjectMapper om, Class<T> type, String sqlTemplate,
+            Map<String, QueryParam> paramDefs, Object[] args) {
         List<T> results = queryList(ds, om, type, sqlTemplate, paramDefs, args);
-        if (results.isEmpty()) throw new NoRowsException("Expected 1 row, got 0");
-        if (results.size() > 1) throw new TooManyRowsException("Expected 1 row, got " + results.size());
+        if (results.isEmpty())
+            throw new NoRowsException("Expected 1 row, got 0");
+        if (results.size() > 1)
+            throw new TooManyRowsException("Expected 1 row, got " + results.size());
         return results.get(0);
     }
 
-    static <T> Optional<T> queryOptional(DataSource ds, ObjectMapper om, Class<T> type,
-                                          String sqlTemplate, Map<String, QueryParam> paramDefs, Object[] args) {
+    static <T> Optional<T> queryOptional(DataSource ds, ObjectMapper om, Class<T> type, String sqlTemplate,
+            Map<String, QueryParam> paramDefs, Object[] args) {
         List<T> results = queryList(ds, om, type, sqlTemplate, paramDefs, args);
-        if (results.isEmpty()) return Optional.empty();
-        if (results.size() > 1) throw new TooManyRowsException("Expected 0-1 rows, got " + results.size());
+        if (results.isEmpty())
+            return Optional.empty();
+        if (results.size() > 1)
+            throw new TooManyRowsException("Expected 0-1 rows, got " + results.size());
         return Optional.of(results.get(0));
     }
 
     @SuppressWarnings("unchecked")
-    static <T> List<T> queryList(DataSource ds, ObjectMapper om, Class<T> type,
-                                  String sqlTemplate, Map<String, QueryParam> paramDefs, Object[] args) {
+    static <T> List<T> queryList(DataSource ds, ObjectMapper om, Class<T> type, String sqlTemplate,
+            Map<String, QueryParam> paramDefs, Object[] args) {
         var parsed = SqlTemplate.of(sqlTemplate).process(paramDefs, args);
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(parsed.sql())) {
+                PreparedStatement ps = conn.prepareStatement(parsed.sql())) {
             bindParams(ps, parsed, om);
             if (JdbcBinder.isScalar(type)) {
                 return readScalarResults(ps, type);
@@ -58,11 +63,11 @@ public final class SqlHelper {
 
     // --- Execute (no result) ---
 
-    static void execute(DataSource ds, ObjectMapper om, String sqlTemplate,
-                        Map<String, QueryParam> paramDefs, Object[] args) {
+    static void execute(DataSource ds, ObjectMapper om, String sqlTemplate, Map<String, QueryParam> paramDefs,
+            Object[] args) {
         var parsed = SqlTemplate.of(sqlTemplate).process(paramDefs, args);
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(parsed.sql())) {
+                PreparedStatement ps = conn.prepareStatement(parsed.sql())) {
             bindParams(ps, parsed, om);
             ps.executeUpdate();
         } catch (SQLException e) {
@@ -70,11 +75,11 @@ public final class SqlHelper {
         }
     }
 
-    static int executeUpdate(DataSource ds, ObjectMapper om, String sqlTemplate,
-                             Map<String, QueryParam> paramDefs, Object[] args) {
+    static int executeUpdate(DataSource ds, ObjectMapper om, String sqlTemplate, Map<String, QueryParam> paramDefs,
+            Object[] args) {
         var parsed = SqlTemplate.of(sqlTemplate).process(paramDefs, args);
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(parsed.sql())) {
+                PreparedStatement ps = conn.prepareStatement(parsed.sql())) {
             bindParams(ps, parsed, om);
             return ps.executeUpdate();
         } catch (SQLException e) {
@@ -96,7 +101,8 @@ public final class SqlHelper {
         }
     }
 
-    private static void bindParams(PreparedStatement ps, SqlTemplate.ParsedSql parsed, ObjectMapper om) throws SQLException {
+    private static void bindParams(PreparedStatement ps, SqlTemplate.ParsedSql parsed, ObjectMapper om)
+            throws SQLException {
         var params = parsed.params();
         var setters = parsed.setters();
         for (int i = 0; i < params.size(); i++) {

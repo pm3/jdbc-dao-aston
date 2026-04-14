@@ -5,8 +5,8 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Central registry for {@link BeanMeta} instances.
- * Tries ServiceLoader first (compile-time generated), falls back to reflection.
+ * Central registry for {@link BeanMeta} instances. Tries ServiceLoader first (compile-time generated), falls back to
+ * reflection.
  */
 public final class BeanMetaRegistry {
 
@@ -14,12 +14,14 @@ public final class BeanMetaRegistry {
     private static final Map<Class<?>, BeanMeta<?>> COMPILED = new ConcurrentHashMap<>();
     private static volatile boolean serviceLoaderInitialized = false;
 
-    private BeanMetaRegistry() {}
+    private BeanMetaRegistry() {
+    }
 
     @SuppressWarnings("unchecked")
     public static <T> BeanMeta<T> forClass(Class<T> clazz) {
         BeanMeta<?> meta = CACHE.get(clazz);
-        if (meta != null) return (BeanMeta<T>) meta;
+        if (meta != null)
+            return (BeanMeta<T>) meta;
 
         ensureServiceLoaderInitialized();
 
@@ -41,9 +43,11 @@ public final class BeanMetaRegistry {
     }
 
     private static void ensureServiceLoaderInitialized() {
-        if (serviceLoaderInitialized) return;
+        if (serviceLoaderInitialized)
+            return;
         synchronized (BeanMetaRegistry.class) {
-            if (serviceLoaderInitialized) return;
+            if (serviceLoaderInitialized)
+                return;
             ServiceLoader<BeanMeta> loader = ServiceLoader.load(BeanMeta.class);
             for (BeanMeta<?> meta : loader) {
                 COMPILED.put(meta.type(), meta);

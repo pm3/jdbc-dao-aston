@@ -7,8 +7,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Wraps multiple values for expanding into IN clause placeholders.
- * Spread.of() throws if empty — unless used inside an optional block.
+ * Wraps multiple values for expanding into IN clause placeholders. Spread.of() throws if empty — unless used inside an
+ * optional block.
  */
 public final class Spread<T> {
 

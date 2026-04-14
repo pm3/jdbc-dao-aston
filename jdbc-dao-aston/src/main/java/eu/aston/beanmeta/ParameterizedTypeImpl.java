@@ -36,10 +36,11 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ParameterizedType that)) return false;
-        return rawType.equals(that.getRawType())
-                && Arrays.equals(actualTypeArguments, that.getActualTypeArguments())
+        if (this == o)
+            return true;
+        if (!(o instanceof ParameterizedType that))
+            return false;
+        return rawType.equals(that.getRawType()) && Arrays.equals(actualTypeArguments, that.getActualTypeArguments())
                 && that.getOwnerType() == null;
     }
 
@@ -50,9 +51,11 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
 
     @Override
     public String toString() {
-        if (actualTypeArguments.length == 0) return rawType.getTypeName();
+        if (actualTypeArguments.length == 0)
+            return rawType.getTypeName();
         var sj = new StringJoiner(", ", rawType.getTypeName() + "<", ">");
-        for (Type t : actualTypeArguments) sj.add(t.getTypeName());
+        for (Type t : actualTypeArguments)
+            sj.add(t.getTypeName());
         return sj.toString();
     }
 }

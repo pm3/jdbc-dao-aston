@@ -21,8 +21,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests against PostgreSQL running in a Docker container.
- * Container is started/stopped automatically via @BeforeAll/@AfterAll.
+ * Integration tests against PostgreSQL running in a Docker container. Container is started/stopped automatically
+ * via @BeforeAll/@AfterAll.
  */
 class PostgresIntegrationTest {
 
@@ -37,24 +37,31 @@ class PostgresIntegrationTest {
 
     // --- Entities ---
 
-    public record User(String id, String name, String email, boolean active, Instant createdat) {}
+    public record User(String id, String name, String email, boolean active, Instant createdat) {
+    }
 
-    public record Product(String id, String name, double price, Map<String, String> attrs) {}
+    public record Product(String id, String name, double price, Map<String, String> attrs) {
+    }
 
-    public record AuditLog(long id, String action, String details) {}
+    public record AuditLog(long id, String action, String details) {
+    }
 
     // --- DAOs ---
 
     @DaoApi
     public interface UserDao {
-        EntityConfig<User> USER = EntityConfig.of(User.class, "users")
-                .createdAt("createdat").updatedAt("").build();
+        EntityConfig<User> USER = EntityConfig.of(User.class, "users").createdAt("createdat").updatedAt("").build();
 
         User loadById(String id);
+
         void insertUser(User user);
+
         void updateUser(User user);
+
         void saveUser(User user);
+
         void deleteUser(User user);
+
         void deleteById(String id);
 
         @Query("SELECT * FROM users WHERE email=:email")
@@ -90,10 +97,10 @@ class PostgresIntegrationTest {
 
     @DaoApi
     public interface ProductDao {
-        EntityConfig<Product> PRODUCT = EntityConfig.of(Product.class, "products")
-                .createdAt("").updatedAt("").build();
+        EntityConfig<Product> PRODUCT = EntityConfig.of(Product.class, "products").createdAt("").updatedAt("").build();
 
         void insertProduct(Product product);
+
         Product loadById(String id);
 
         @Query("SELECT * FROM products WHERE :where")
@@ -102,10 +109,10 @@ class PostgresIntegrationTest {
 
     @DaoApi
     public interface AuditDao {
-        EntityConfig<AuditLog> AUDIT = EntityConfig.of(AuditLog.class, "audit_log")
-                .createdAt("").updatedAt("").build();
+        EntityConfig<AuditLog> AUDIT = EntityConfig.of(AuditLog.class, "audit_log").createdAt("").updatedAt("").build();
 
         void insertAudit(AuditLog log);
+
         void saveAudit(AuditLog log);
 
         @Query("SELECT * FROM audit_log ORDER BY id")
@@ -120,30 +127,26 @@ class PostgresIntegrationTest {
         exec("docker", "rm", "-f", CONTAINER_NAME);
 
         // start fresh container
-        exec("docker", "run", "-d", "--name", CONTAINER_NAME,
-                "-e", "POSTGRES_USER=" + PG_USER,
-                "-e", "POSTGRES_PASSWORD=" + PG_PASS,
-                "-e", "POSTGRES_DB=" + PG_DB,
-                "-p", "0:5432",
-                "postgres:17");
+        exec("docker", "run", "-d", "--name", CONTAINER_NAME, "-e", "POSTGRES_USER=" + PG_USER, "-e",
+                "POSTGRES_PASSWORD=" + PG_PASS, "-e", "POSTGRES_DB=" + PG_DB, "-p", "0:5432", "postgres:17");
 
         // resolve mapped port
-        pgPort = Integer.parseInt(
-                execOutput("docker", "port", CONTAINER_NAME, "5432")
-                        .replaceAll(".*:", "").trim());
+        pgPort = Integer.parseInt(execOutput("docker", "port", CONTAINER_NAME, "5432").replaceAll(".*:", "").trim());
 
         // wait for postgres to be ready
         for (int i = 0; i < 30; i++) {
             try {
                 int exitCode = exec("docker", "exec", CONTAINER_NAME, "pg_isready", "-U", PG_USER);
-                if (exitCode == 0) break;
-            } catch (Exception ignored) {}
+                if (exitCode == 0)
+                    break;
+            } catch (Exception ignored) {
+            }
             Thread.sleep(500);
         }
 
         PGSimpleDataSource ds = new PGSimpleDataSource();
-        ds.setServerNames(new String[]{"localhost"});
-        ds.setPortNumbers(new int[]{pgPort});
+        ds.setServerNames(new String[] { "localhost" });
+        ds.setPortNumbers(new int[] { pgPort });
         ds.setDatabaseName(PG_DB);
         ds.setUser(PG_USER);
         ds.setPassword(PG_PASS);
@@ -158,32 +161,21 @@ class PostgresIntegrationTest {
     @BeforeEach
     void createTables() throws Exception {
         try (Connection conn = dataSource.getConnection();
-             Statement st = conn.createStatement()) {
+                Statement st = conn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS users");
-            st.execute("CREATE TABLE users ("
-                    + "id VARCHAR(50) PRIMARY KEY, "
-                    + "name VARCHAR(100), "
-                    + "email VARCHAR(100), "
-                    + "active BOOLEAN DEFAULT true, "
-                    + "createdat TIMESTAMPTZ DEFAULT now()"
+            st.execute("CREATE TABLE users (" + "id VARCHAR(50) PRIMARY KEY, " + "name VARCHAR(100), "
+                    + "email VARCHAR(100), " + "active BOOLEAN DEFAULT true, " + "createdat TIMESTAMPTZ DEFAULT now()"
                     + ")");
 
             st.execute("DROP TABLE IF EXISTS products");
-            st.execute("CREATE TABLE products ("
-                    + "id VARCHAR(50) PRIMARY KEY, "
-                    + "name VARCHAR(100), "
-                    + "price DOUBLE PRECISION, "
-                    + "attrs JSONB"
-                    + ")");
+            st.execute("CREATE TABLE products (" + "id VARCHAR(50) PRIMARY KEY, " + "name VARCHAR(100), "
+                    + "price DOUBLE PRECISION, " + "attrs JSONB" + ")");
 
             st.execute("DROP TABLE IF EXISTS audit_log");
             st.execute("DROP SEQUENCE IF EXISTS audit_log_seq");
             st.execute("CREATE SEQUENCE audit_log_seq");
-            st.execute("CREATE TABLE audit_log ("
-                    + "id BIGINT PRIMARY KEY DEFAULT nextval('audit_log_seq'), "
-                    + "action VARCHAR(100), "
-                    + "details TEXT"
-                    + ")");
+            st.execute("CREATE TABLE audit_log (" + "id BIGINT PRIMARY KEY DEFAULT nextval('audit_log_seq'), "
+                    + "action VARCHAR(100), " + "details TEXT" + ")");
         }
     }
 
@@ -429,10 +421,7 @@ class PostgresIntegrationTest {
         dao.insertUser(new User("2", "Jane", "jane@test.com", true, null));
         dao.insertUser(new User("3", "Bob", "bob@test.com", false, null));
 
-        List<User> result = dao.findWhere(Condition.and(
-                Condition.eq("active", true),
-                Condition.like("name", "Jo%")
-        ));
+        List<User> result = dao.findWhere(Condition.and(Condition.eq("active", true), Condition.like("name", "Jo%")));
         assertEquals(1, result.size());
         assertEquals("1", result.get(0).id());
     }
@@ -444,10 +433,7 @@ class PostgresIntegrationTest {
         dao.insertUser(new User("2", "Jane", "jane@test.com", true, null));
         dao.insertUser(new User("3", "Bob", "bob@test.com", false, null));
 
-        assertEquals(2, dao.findWhere(Condition.or(
-                Condition.eq("name", "John"),
-                Condition.eq("name", "Bob")
-        )).size());
+        assertEquals(2, dao.findWhere(Condition.or(Condition.eq("name", "John"), Condition.eq("name", "Bob"))).size());
     }
 
     @Test
@@ -490,10 +476,7 @@ class PostgresIntegrationTest {
         dao.insertUser(new User("1", "John", "john@test.com", true, null));
         dao.insertUser(new User("2", "Jane", "jane@test.com", false, null));
 
-        assertEquals(2, dao.findWhere(Condition.and(
-                Condition.eq("name", null),
-                Condition.like("email", null)
-        )).size());
+        assertEquals(2, dao.findWhere(Condition.and(Condition.eq("name", null), Condition.like("email", null))).size());
     }
 
     @Test
@@ -541,8 +524,7 @@ class PostgresIntegrationTest {
     @Test
     void jsonColumn_withoutObjectMapper_throws() {
         ProductDao dao = DaoRegistry.forClass(ProductDao.class, dataSource);
-        assertThrows(DaoException.class, () ->
-                dao.insertProduct(new Product("1", "Widget", 19.99, Map.of("k", "v"))));
+        assertThrows(DaoException.class, () -> dao.insertProduct(new Product("1", "Widget", 19.99, Map.of("k", "v"))));
     }
 
     // ==================== Multi-entity DAO ====================

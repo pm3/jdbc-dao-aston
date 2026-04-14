@@ -16,13 +16,14 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Pre-computed entity CRUD operations. SQL, setters, and property mappings
- * are resolved once per EntityConfig; lives as a lazy field on EntityConfig.
+ * Pre-computed entity CRUD operations. SQL, setters, and property mappings are resolved once per EntityConfig; lives as
+ * a lazy field on EntityConfig.
  */
 public final class EntityBinder<T> {
 
     /** Per-column metadata, resolved once at init. */
-    record ColInfo(String name, JdbcBinder.ParamSetter setter, boolean isPk, boolean isTimestamp) {}
+    record ColInfo(String name, JdbcBinder.ParamSetter setter, boolean isPk, boolean isTimestamp) {
+    }
 
     private final BeanMeta<T> meta;
     private final BeanReader<T> beanReader;
@@ -66,16 +67,18 @@ public final class EntityBinder<T> {
             boolean isTs = (createdAt != null && name.equalsIgnoreCase(createdAt))
                     || (updatedAt != null && name.equalsIgnoreCase(updatedAt));
             columns[i] = new ColInfo(name, JdbcBinder.setterFor(types.get(i)), isPk, isTs);
-            if (isPk) pkIdx = i;
+            if (isPk)
+                pkIdx = i;
         }
         this.pkColIdx = pkIdx;
 
         // --- INSERT (all columns including PK) ---
         {
             var colNames = new ArrayList<String>();
-            for (ColInfo col : columns) colNames.add(col.name);
-            this.insertSql = "INSERT INTO " + table + " (" + String.join(", ", colNames)
-                    + ") VALUES (" + String.join(", ", Collections.nCopies(colNames.size(), "?")) + ")";
+            for (ColInfo col : columns)
+                colNames.add(col.name);
+            this.insertSql = "INSERT INTO " + table + " (" + String.join(", ", colNames) + ") VALUES ("
+                    + String.join(", ", Collections.nCopies(colNames.size(), "?")) + ")";
         }
 
         // --- INSERT without PK (for auto-increment via save) ---
@@ -83,12 +86,13 @@ public final class EntityBinder<T> {
             var colNames = new ArrayList<String>();
             var order = new ArrayList<Integer>();
             for (int i = 0; i < columns.length; i++) {
-                if (columns[i].isPk) continue;
+                if (columns[i].isPk)
+                    continue;
                 colNames.add(columns[i].name);
                 order.add(i);
             }
-            this.insertWithoutPkSql = "INSERT INTO " + table + " (" + String.join(", ", colNames)
-                    + ") VALUES (" + String.join(", ", Collections.nCopies(colNames.size(), "?")) + ")";
+            this.insertWithoutPkSql = "INSERT INTO " + table + " (" + String.join(", ", colNames) + ") VALUES ("
+                    + String.join(", ", Collections.nCopies(colNames.size(), "?")) + ")";
             this.insertWithoutPkParamOrder = order.stream().mapToInt(Integer::intValue).toArray();
         }
 
@@ -96,14 +100,14 @@ public final class EntityBinder<T> {
         var setClauses = new ArrayList<String>();
         var upOrder = new ArrayList<Integer>();
         for (int i = 0; i < columns.length; i++) {
-            if (columns[i].isPk) continue;
+            if (columns[i].isPk)
+                continue;
             setClauses.add(columns[i].name + "=?");
             upOrder.add(i);
         }
         upOrder.add(pkIdx);
         this.updateParamOrder = upOrder.stream().mapToInt(Integer::intValue).toArray();
-        this.updateSql = "UPDATE " + table + " SET " + String.join(", ", setClauses)
-                + " WHERE " + pk + "=?";
+        this.updateSql = "UPDATE " + table + " SET " + String.join(", ", setClauses) + " WHERE " + pk + "=?";
 
         // --- DELETE / LOAD ---
         this.deleteSql = "DELETE FROM " + table + " WHERE " + pk + "=?";
@@ -114,7 +118,7 @@ public final class EntityBinder<T> {
 
     public void insertWithPk(DataSource ds, ObjectMapper om, T entity) {
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                PreparedStatement ps = conn.prepareStatement(insertSql)) {
             for (int i = 0; i < columns.length; i++) {
                 ColInfo col = columns[i];
                 Object value = meta.get(entity, col.name);
@@ -128,7 +132,7 @@ public final class EntityBinder<T> {
 
     public void update(DataSource ds, ObjectMapper om, T entity) {
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(updateSql)) {
+                PreparedStatement ps = conn.prepareStatement(updateSql)) {
             for (int paramPos = 0; paramPos < updateParamOrder.length; paramPos++) {
                 int colIdx = updateParamOrder[paramPos];
                 ColInfo col = columns[colIdx];
@@ -153,7 +157,7 @@ public final class EntityBinder<T> {
 
     private void insertWithoutPk(DataSource ds, ObjectMapper om, T entity) {
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(insertWithoutPkSql)) {
+                PreparedStatement ps = conn.prepareStatement(insertWithoutPkSql)) {
             for (int paramPos = 0; paramPos < insertWithoutPkParamOrder.length; paramPos++) {
                 int colIdx = insertWithoutPkParamOrder[paramPos];
                 ColInfo col = columns[colIdx];
@@ -174,7 +178,7 @@ public final class EntityBinder<T> {
             pkValue = entityOrPk;
         }
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(deleteSql)) {
+                PreparedStatement ps = conn.prepareStatement(deleteSql)) {
             JdbcBinder.setParam(ps, 1, pkValue, columns[pkColIdx].setter, om);
             ps.executeUpdate();
         } catch (SQLException e) {
@@ -184,11 +188,13 @@ public final class EntityBinder<T> {
 
     public T load(DataSource ds, ObjectMapper om, Object pkValue) {
         try (Connection conn = ds.getConnection();
-             PreparedStatement ps = conn.prepareStatement(loadSql)) {
+                PreparedStatement ps = conn.prepareStatement(loadSql)) {
             JdbcBinder.setParam(ps, 1, pkValue, columns[pkColIdx].setter, om);
             List<T> results = beanReader.readBeanResults(ps, om);
-            if (results.isEmpty()) throw new NoRowsException("Expected 1 row, got 0");
-            if (results.size() > 1) throw new TooManyRowsException("Expected 1 row, got " + results.size());
+            if (results.isEmpty())
+                throw new NoRowsException("Expected 1 row, got 0");
+            if (results.size() > 1)
+                throw new TooManyRowsException("Expected 1 row, got " + results.size());
             return results.get(0);
         } catch (NoRowsException | TooManyRowsException e) {
             throw e;

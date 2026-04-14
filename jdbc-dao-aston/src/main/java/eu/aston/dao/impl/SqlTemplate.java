@@ -12,8 +12,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Pre-parsed SQL template. Parsing (regex) happens once per unique template string,
- * subsequent calls only assemble SQL from cached fragments.
+ * Pre-parsed SQL template. Parsing (regex) happens once per unique template string, subsequent calls only assemble SQL
+ * from cached fragments.
  */
 public final class SqlTemplate {
 
@@ -26,7 +26,8 @@ public final class SqlTemplate {
         var sb = new StringBuilder();
         SPREAD_PLACEHOLDERS[0] = "";
         for (int i = 1; i < SPREAD_PLACEHOLDERS.length; i++) {
-            if (i > 1) sb.append(',');
+            if (i > 1)
+                sb.append(',');
             sb.append('?');
             SPREAD_PLACEHOLDERS[i] = sb.toString();
         }
@@ -36,10 +37,17 @@ public final class SqlTemplate {
 
     // --- Fragment types ---
 
-    sealed interface Fragment {}
-    record TextFragment(String text) implements Fragment {}
-    record ParamFragment(String name) implements Fragment {}
-    record OptionalBlockFragment(List<Fragment> parts, List<String> paramNames) implements Fragment {}
+    sealed interface Fragment {
+    }
+
+    record TextFragment(String text) implements Fragment {
+    }
+
+    record ParamFragment(String name) implements Fragment {
+    }
+
+    record OptionalBlockFragment(List<Fragment> parts, List<String> paramNames) implements Fragment {
+    }
 
     // --- Instance state (immutable, created once per template) ---
 
@@ -57,7 +65,8 @@ public final class SqlTemplate {
 
     // --- Public API ---
 
-    record ParsedSql(String sql, List<Object> params, JdbcBinder.ParamSetter[] setters) {}
+    record ParsedSql(String sql, List<Object> params, JdbcBinder.ParamSetter[] setters) {
+    }
 
     /** Get or create a cached SqlTemplate for the given template string. */
     public static SqlTemplate of(String template) {
@@ -67,7 +76,8 @@ public final class SqlTemplate {
     /** Assemble final SQL from QueryParam definitions + args array. Setters lazily pre-resolved. */
     public ParsedSql process(Map<String, QueryParam> paramDefs, Object[] args) {
         if (paramDefs == null || paramDefs.isEmpty()) {
-            if (simpleSql != null) return new ParsedSql(simpleSql, List.of(), null);
+            if (simpleSql != null)
+                return new ParsedSql(simpleSql, List.of(), null);
             var sb = new StringBuilder();
             var positionalParams = new ArrayList<Object>();
             assembleFragments(fragments, Map.of(), sb, positionalParams);
@@ -101,7 +111,8 @@ public final class SqlTemplate {
             QueryParam pp = paramDefs.get(name);
             if (pp != null) {
                 Object value = args[pp.position];
-                if (value instanceof Spread<?> || value instanceof ICondition) return true;
+                if (value instanceof Spread<?> || value instanceof ICondition)
+                    return true;
             }
         }
         return false;
@@ -179,8 +190,8 @@ public final class SqlTemplate {
 
     // --- Assembly (runs per call, but no regex) ---
 
-    private static void assembleFragments(List<Fragment> fragments, Map<String, Object> params,
-                                           StringBuilder sb, List<Object> positionalParams) {
+    private static void assembleFragments(List<Fragment> fragments, Map<String, Object> params, StringBuilder sb,
+            List<Object> positionalParams) {
         for (Fragment f : fragments) {
             if (f instanceof TextFragment t) {
                 sb.append(t.text());
@@ -189,7 +200,10 @@ public final class SqlTemplate {
             } else if (f instanceof OptionalBlockFragment ob) {
                 boolean hasNull = false;
                 for (String name : ob.paramNames()) {
-                    if (params.get(name) == null) { hasNull = true; break; }
+                    if (params.get(name) == null) {
+                        hasNull = true;
+                        break;
+                    }
                 }
                 if (!hasNull) {
                     assembleFragments(ob.parts(), params, sb, positionalParams);
@@ -198,13 +212,12 @@ public final class SqlTemplate {
         }
     }
 
-    private static void appendParam(String paramName, Map<String, Object> params,
-                                     StringBuilder sb, List<Object> positionalParams) {
+    private static void appendParam(String paramName, Map<String, Object> params, StringBuilder sb,
+            List<Object> positionalParams) {
         Object value = params.get(paramName);
         if (value instanceof Spread<?> spread) {
             int size = spread.values().size();
-            sb.append(size < SPREAD_PLACEHOLDERS.length
-                    ? SPREAD_PLACEHOLDERS[size]
+            sb.append(size < SPREAD_PLACEHOLDERS.length ? SPREAD_PLACEHOLDERS[size]
                     : String.join(",", Collections.nCopies(size, "?")));
             positionalParams.addAll(spread.values());
         } else if (value instanceof ICondition cond) {

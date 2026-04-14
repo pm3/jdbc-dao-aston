@@ -20,8 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Reflection-based proxy InvocationHandler for DAO interfaces.
- * All resolution happens eagerly in the constructor — invoke() is a straight lookup + call.
+ * Reflection-based proxy InvocationHandler for DAO interfaces. All resolution happens eagerly in the constructor —
+ * invoke() is a straight lookup + call.
  */
 public final class DaoProxy implements InvocationHandler {
 
@@ -31,8 +31,10 @@ public final class DaoProxy implements InvocationHandler {
         var entityConfigs = scanEntityConfigs(daoInterface);
         var map = new HashMap<Method, MethodExecutor>();
         for (Method method : daoInterface.getMethods()) {
-            if (method.getDeclaringClass() == Object.class) continue;
-            if (method.isDefault()) continue;
+            if (method.getDeclaringClass() == Object.class)
+                continue;
+            if (method.isDefault())
+                continue;
             map.put(method, buildExecutor(method, ds, om, entityConfigs));
         }
         this.executors = Map.copyOf(map);
@@ -47,7 +49,7 @@ public final class DaoProxy implements InvocationHandler {
     // --- Executor building (runs once per method in constructor) ---
 
     private static MethodExecutor buildExecutor(Method method, DataSource ds, ObjectMapper om,
-                                                 Map<Class<?>, EntityConfig<?>> entityConfigs) {
+            Map<Class<?>, EntityConfig<?>> entityConfigs) {
         Query queryAnn = method.getAnnotation(Query.class);
         if (queryAnn != null) {
             return buildQueryExecutor(method, queryAnn.value(), ds, om);
@@ -61,15 +63,14 @@ public final class DaoProxy implements InvocationHandler {
         String[] paramNames = getParamNames(method);
         Class<?> type = resolveElementType(method);
 
-        boolean expandBean = paramNames.length == 1
-                && !JdbcBinder.isScalar(method.getParameterTypes()[0])
+        boolean expandBean = paramNames.length == 1 && !JdbcBinder.isScalar(method.getParameterTypes()[0])
                 && !eu.aston.dao.Spread.class.isAssignableFrom(method.getParameterTypes()[0])
                 && !eu.aston.dao.ICondition.class.isAssignableFrom(method.getParameterTypes()[0]);
 
         Map<String, QueryParam> paramDefs;
         ArgsMapper argsMapper;
         if (expandBean) {
-            @SuppressWarnings({"unchecked", "rawtypes"})
+            @SuppressWarnings({ "unchecked", "rawtypes" })
             BeanMeta beanMeta = BeanMetaRegistry.forClass(method.getParameterTypes()[0]);
             paramDefs = QueryParam.fromBeanMeta(beanMeta);
             Map<String, QueryParam> pd = paramDefs; // effectively final
@@ -82,7 +83,10 @@ public final class DaoProxy implements InvocationHandler {
         // Pre-select the exact SqlHelper method — no switch at runtime
         Map<String, QueryParam> pd = paramDefs;
         return switch (resolveReturnKind(method)) {
-            case VOID -> args -> { SqlHelper.execute(ds, om, sql, pd, argsMapper.map(args)); return null; };
+            case VOID -> args -> {
+                SqlHelper.execute(ds, om, sql, pd, argsMapper.map(args));
+                return null;
+            };
             case INT -> args -> SqlHelper.executeUpdate(ds, om, sql, pd, argsMapper.map(args));
             case ONE -> args -> SqlHelper.queryOne(ds, om, type, sql, pd, argsMapper.map(args));
             case OPTIONAL -> args -> SqlHelper.queryOptional(ds, om, type, sql, pd, argsMapper.map(args));
@@ -92,9 +96,9 @@ public final class DaoProxy implements InvocationHandler {
 
     // --- Entity convention methods ---
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static MethodExecutor buildEntityExecutor(Method method, DataSource ds, ObjectMapper om,
-                                                       Map<Class<?>, EntityConfig<?>> entityConfigs) {
+            Map<Class<?>, EntityConfig<?>> entityConfigs) {
         String name = method.getName();
         if (name.startsWith("load")) {
             EntityConfig<?> config = findConfig(entityConfigs, method.getReturnType());
@@ -102,22 +106,34 @@ public final class DaoProxy implements InvocationHandler {
         }
         if (name.startsWith("insert")) {
             EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
-            return args -> { config.binder().insertWithPk(ds, om, args[0]); return null; };
+            return args -> {
+                config.binder().insertWithPk(ds, om, args[0]);
+                return null;
+            };
         }
         if (name.startsWith("update")) {
             EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
-            return args -> { config.binder().update(ds, om, args[0]); return null; };
+            return args -> {
+                config.binder().update(ds, om, args[0]);
+                return null;
+            };
         }
         if (name.startsWith("save")) {
             EntityConfig config = findConfig(entityConfigs, method.getParameterTypes()[0]);
-            return args -> { config.binder().save(ds, om, args[0]); return null; };
+            return args -> {
+                config.binder().save(ds, om, args[0]);
+                return null;
+            };
         }
         if (name.startsWith("delete")) {
             EntityConfig config = resolveDeleteConfig(entityConfigs, method);
-            return args -> { config.binder().delete(ds, om, args[0]); return null; };
+            return args -> {
+                config.binder().delete(ds, om, args[0]);
+                return null;
+            };
         }
-        throw new DaoException("Cannot resolve method: " + name
-                + " — must have @Query or start with load/insert/update/save/delete");
+        throw new DaoException(
+                "Cannot resolve method: " + name + " — must have @Query or start with load/insert/update/save/delete");
     }
 
     // --- Helpers ---
@@ -126,15 +142,18 @@ public final class DaoProxy implements InvocationHandler {
     private static EntityConfig resolveDeleteConfig(Map<Class<?>, EntityConfig<?>> entityConfigs, Method method) {
         if (method.getParameterTypes().length == 1) {
             EntityConfig<?> config = entityConfigs.get(method.getParameterTypes()[0]);
-            if (config != null) return config;
-            if (entityConfigs.size() == 1) return entityConfigs.values().iterator().next();
+            if (config != null)
+                return config;
+            if (entityConfigs.size() == 1)
+                return entityConfigs.values().iterator().next();
         }
         throw new DaoException("Cannot resolve delete entity for method: " + method.getName());
     }
 
     private static EntityConfig<?> findConfig(Map<Class<?>, EntityConfig<?>> entityConfigs, Class<?> beanType) {
         EntityConfig<?> config = entityConfigs.get(beanType);
-        if (config == null) throw new DaoException("No EntityConfig found for type: " + beanType.getName());
+        if (config == null)
+            throw new DaoException("No EntityConfig found for type: " + beanType.getName());
         return config;
     }
 
@@ -155,7 +174,8 @@ public final class DaoProxy implements InvocationHandler {
     }
 
     private static Map<String, QueryParam> buildQueryParams(String[] names, Class<?>[] types) {
-        if (names.length == 0) return Map.of();
+        if (names.length == 0)
+            return Map.of();
         var map = new HashMap<String, QueryParam>(names.length);
         for (int i = 0; i < names.length; i++) {
             map.put(names[i], new QueryParam(names[i], i, types[i]));
@@ -163,7 +183,7 @@ public final class DaoProxy implements InvocationHandler {
         return Map.copyOf(map);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private static Object[] extractBeanArgs(BeanMeta meta, Map<String, QueryParam> paramDefs, Object bean) {
         Object[] args = new Object[paramDefs.size()];
         if (bean != null) {
@@ -185,14 +205,20 @@ public final class DaoProxy implements InvocationHandler {
 
     // --- Return type resolution ---
 
-    private enum ReturnKind { VOID, INT, ONE, OPTIONAL, LIST }
+    private enum ReturnKind {
+        VOID, INT, ONE, OPTIONAL, LIST
+    }
 
     private static ReturnKind resolveReturnKind(Method method) {
         Class<?> rt = method.getReturnType();
-        if (rt == void.class) return ReturnKind.VOID;
-        if (rt == int.class || rt == Integer.class) return ReturnKind.INT;
-        if (rt == Optional.class) return ReturnKind.OPTIONAL;
-        if (rt == List.class) return ReturnKind.LIST;
+        if (rt == void.class)
+            return ReturnKind.VOID;
+        if (rt == int.class || rt == Integer.class)
+            return ReturnKind.INT;
+        if (rt == Optional.class)
+            return ReturnKind.OPTIONAL;
+        if (rt == List.class)
+            return ReturnKind.LIST;
         return ReturnKind.ONE;
     }
 
@@ -202,8 +228,10 @@ public final class DaoProxy implements InvocationHandler {
             Type genericReturn = method.getGenericReturnType();
             if (genericReturn instanceof ParameterizedType pt) {
                 Type arg = pt.getActualTypeArguments()[0];
-                if (arg instanceof Class<?> c) return c;
-                if (arg instanceof ParameterizedType pt2) return (Class<?>) pt2.getRawType();
+                if (arg instanceof Class<?> c)
+                    return c;
+                if (arg instanceof ParameterizedType pt2)
+                    return (Class<?>) pt2.getRawType();
             }
         }
         return rt;

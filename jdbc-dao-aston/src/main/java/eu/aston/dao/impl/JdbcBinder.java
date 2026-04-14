@@ -17,8 +17,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Typed JDBC parameter setters and column readers, resolved once by Class.
- * Eliminates per-call instanceof chains in setParam/readScalar.
+ * Typed JDBC parameter setters and column readers, resolved once by Class. Eliminates per-call instanceof chains in
+ * setParam/readScalar.
  */
 public final class JdbcBinder {
 
@@ -88,9 +88,13 @@ public final class JdbcBinder {
         READERS = Map.copyOf(r);
     }
 
-    private JdbcBinder() {}
+    private JdbcBinder() {
+    }
 
-    /** JSON fallback setter — serializes value to JSON string via ObjectMapper stored in thread-local or passed separately. */
+    /**
+     * JSON fallback setter — serializes value to JSON string via ObjectMapper stored in thread-local or passed
+     * separately.
+     */
     public static final ParamSetter JSON_SETTER = (ps, index, value) -> {
         // This setter requires ObjectMapper — use setParamWithOm for JSON columns
         throw new UnsupportedOperationException("JSON setter must be called via setParam with ObjectMapper");
@@ -113,8 +117,8 @@ public final class JdbcBinder {
     }
 
     /** Set param with null handling. Uses pre-resolved setter; JSON_SETTER triggers JSON serialization. */
-    public static void setParam(PreparedStatement ps, int index, Object value,
-                                 ParamSetter setter, ObjectMapper om) throws SQLException {
+    public static void setParam(PreparedStatement ps, int index, Object value, ParamSetter setter, ObjectMapper om)
+            throws SQLException {
         if (value == null) {
             ps.setNull(index, Types.NULL);
             return;
@@ -124,7 +128,8 @@ public final class JdbcBinder {
             return;
         }
         // JSON fallback
-        if (om == null) throw new DaoException("ObjectMapper required for JSON column (type: " + value.getClass().getName() + ")");
+        if (om == null)
+            throw new DaoException("ObjectMapper required for JSON column (type: " + value.getClass().getName() + ")");
         try {
             String json = om.writeValueAsString(value);
             ps.setObject(index, json, Types.OTHER);
@@ -145,7 +150,8 @@ public final class JdbcBinder {
             return;
         }
         // JSON fallback
-        if (om == null) throw new DaoException("ObjectMapper required for JSON column (type: " + value.getClass().getName() + ")");
+        if (om == null)
+            throw new DaoException("ObjectMapper required for JSON column (type: " + value.getClass().getName() + ")");
         try {
             String json = om.writeValueAsString(value);
             ps.setObject(index, json, Types.OTHER);

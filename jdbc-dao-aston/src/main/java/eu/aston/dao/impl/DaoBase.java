@@ -1,26 +1,27 @@
 package eu.aston.dao.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import eu.aston.beanmeta.BeanMeta;
-import eu.aston.beanmeta.BeanMetaRegistry;
-import eu.aston.dao.EntityConfig;
-
-import javax.sql.DataSource;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import javax.sql.DataSource;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import eu.aston.beanmeta.BeanMeta;
+import eu.aston.beanmeta.BeanMetaRegistry;
+import eu.aston.dao.EntityConfig;
+
 /**
- * Base class for compile-time generated DAO implementations.
- * Provides helper methods that generated code delegates to.
+ * Base class for compile-time generated DAO implementations. Provides helper methods that generated code delegates to.
  */
 public abstract class DaoBase {
 
     protected DataSource dataSource;
     protected ObjectMapper objectMapper;
 
-    protected DaoBase() {}
+    protected DaoBase() {
+    }
 
     protected DaoBase(DataSource dataSource, ObjectMapper objectMapper) {
         this.dataSource = dataSource;
@@ -55,7 +56,8 @@ public abstract class DaoBase {
         return SqlHelper.queryOne(dataSource, objectMapper, type, sql, paramDefs, args);
     }
 
-    protected <T> Optional<T> queryOptional(Class<T> type, String sql, Map<String, QueryParam> paramDefs, Object[] args) {
+    protected <T> Optional<T> queryOptional(Class<T> type, String sql, Map<String, QueryParam> paramDefs,
+            Object[] args) {
         return SqlHelper.queryOptional(dataSource, objectMapper, type, sql, paramDefs, args);
     }
 
@@ -72,9 +74,10 @@ public abstract class DaoBase {
     }
 
     /** Expand a single bean/record into an Object[] matching QueryParam positions. */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     protected static Object[] expandBeanArgs(Map<String, QueryParam> paramDefs, Object bean) {
-        if (bean == null) return new Object[paramDefs.size()];
+        if (bean == null)
+            return new Object[paramDefs.size()];
         BeanMeta meta = BeanMetaRegistry.forClass(bean.getClass());
         Object[] args = new Object[paramDefs.size()];
         for (var entry : paramDefs.entrySet()) {

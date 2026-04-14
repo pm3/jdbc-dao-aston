@@ -9,8 +9,8 @@ import java.util.List;
 @DaoApi
 public interface TestProductDao {
 
-    EntityConfig<TestProduct> PRODUCT = EntityConfig.of(TestProduct.class, "products")
-            .createdAt("").updatedAt("").build();
+    EntityConfig<TestProduct> PRODUCT = EntityConfig.of(TestProduct.class, "products").createdAt("").updatedAt("")
+            .build();
 
     void insertProduct(TestProduct product);
 

@@ -20,15 +20,15 @@ class DaoProxyTest {
 
     // --- Test entity ---
 
-    public record User(String id, String name, String email) {}
+    public record User(String id, String name, String email) {
+    }
 
     // --- Test DAO interface ---
 
     @DaoApi
     public interface UserDao {
 
-        EntityConfig<User> USER = EntityConfig.of(User.class, "users")
-                .createdAt("").updatedAt("").build();
+        EntityConfig<User> USER = EntityConfig.of(User.class, "users").createdAt("").updatedAt("").build();
 
         User loadById(String id);
 
@@ -61,17 +61,18 @@ class DaoProxyTest {
         List<User> findByFilter(UserFilter filter);
     }
 
-    public record UserFilter(String name, String email) {}
+    public record UserFilter(String name, String email) {
+    }
 
     // --- JSON test ---
 
-    public record Item(String id, String name, Map<String, String> props) {}
+    public record Item(String id, String name, Map<String, String> props) {
+    }
 
     @DaoApi
     public interface ItemDao {
 
-        EntityConfig<Item> ITEM = EntityConfig.of(Item.class, "items")
-                .createdAt("").updatedAt("").build();
+        EntityConfig<Item> ITEM = EntityConfig.of(Item.class, "items").createdAt("").updatedAt("").build();
 
         void insertItem(Item item);
 
@@ -86,7 +87,7 @@ class DaoProxyTest {
         this.objectMapper = new ObjectMapper();
 
         try (Connection conn = dataSource.getConnection();
-             Statement st = conn.createStatement()) {
+                Statement st = conn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS users");
             st.execute("CREATE TABLE users (id VARCHAR(50) PRIMARY KEY, name VARCHAR(100), email VARCHAR(100))");
             st.execute("DROP TABLE IF EXISTS items");
@@ -250,21 +251,15 @@ class DaoProxyTest {
 
     @Test
     void conditionDynamic() {
-        ICondition cond = Condition.and(
-                Condition.eq("active", true),
-                Condition.like("name", null),   // skipped
-                Condition.gt("age", 18)
-        );
+        ICondition cond = Condition.and(Condition.eq("active", true), Condition.like("name", null), // skipped
+                Condition.gt("age", 18));
         assertEquals("(active = ? AND age > ?)", buildSql(cond));
         assertEquals(List.of(true, 18), buildParams(cond));
     }
 
     @Test
     void conditionEmpty() {
-        ICondition cond = Condition.and(
-                Condition.eq("a", null),
-                Condition.like("b", null)
-        );
+        ICondition cond = Condition.and(Condition.eq("a", null), Condition.like("b", null));
         assertEquals("", buildSql(cond));
         assertEquals(List.of(), buildParams(cond));
     }
@@ -285,10 +280,7 @@ class DaoProxyTest {
 
     @Test
     void conditionOr() {
-        ICondition cond = Condition.or(
-                Condition.eq("status", "active"),
-                Condition.eq("status", "pending")
-        );
+        ICondition cond = Condition.or(Condition.eq("status", "active"), Condition.eq("status", "pending"));
         assertEquals("(status = ? OR status = ?)", buildSql(cond));
         assertEquals(List.of("active", "pending"), buildParams(cond));
     }

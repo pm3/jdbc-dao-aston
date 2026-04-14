@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Named parameter with known position in args array and lazily-resolved JDBC setter.
- * Created once per method (static field or proxy init), reused across all calls.
+ * Named parameter with known position in args array and lazily-resolved JDBC setter. Created once per method (static
+ * field or proxy init), reused across all calls.
  */
 public final class QueryParam {
 

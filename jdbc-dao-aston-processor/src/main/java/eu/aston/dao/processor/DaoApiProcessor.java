@@ -69,7 +69,7 @@ public class DaoApiProcessor extends AbstractProcessor {
 
         JavaFileObject sourceFile = processingEnv.getFiler().createSourceFile(qualifiedImpl, iface);
         try (Writer writer = sourceFile.openWriter();
-             BufferedWriter bw = new BufferedWriter(writer)) {
+                BufferedWriter bw = new BufferedWriter(writer)) {
             generateImpl(bw, packageName, simpleName, implName, entityConfigs, methods);
         }
 
@@ -81,14 +81,19 @@ public class DaoApiProcessor extends AbstractProcessor {
     private List<EntityConfigInfo> findEntityConfigs(TypeElement iface) {
         var configs = new ArrayList<EntityConfigInfo>();
         for (Element e : iface.getEnclosedElements()) {
-            if (e.getKind() != ElementKind.FIELD) continue;
-            if (!e.getModifiers().contains(Modifier.STATIC)) continue;
+            if (e.getKind() != ElementKind.FIELD)
+                continue;
+            if (!e.getModifiers().contains(Modifier.STATIC))
+                continue;
             TypeMirror fieldType = e.asType();
-            if (fieldType.getKind() != TypeKind.DECLARED) continue;
+            if (fieldType.getKind() != TypeKind.DECLARED)
+                continue;
             DeclaredType dt = (DeclaredType) fieldType;
             String rawName = ((TypeElement) dt.asElement()).getQualifiedName().toString();
-            if (!"eu.aston.dao.EntityConfig".equals(rawName)) continue;
-            if (dt.getTypeArguments().isEmpty()) continue;
+            if (!"eu.aston.dao.EntityConfig".equals(rawName))
+                continue;
+            if (dt.getTypeArguments().isEmpty())
+                continue;
 
             TypeMirror typeArg = dt.getTypeArguments().get(0);
             String entityType = typeArg.toString();
@@ -103,10 +108,13 @@ public class DaoApiProcessor extends AbstractProcessor {
     private List<MethodInfo> findMethods(TypeElement iface) {
         var methods = new ArrayList<MethodInfo>();
         for (Element e : iface.getEnclosedElements()) {
-            if (e.getKind() != ElementKind.METHOD) continue;
+            if (e.getKind() != ElementKind.METHOD)
+                continue;
             ExecutableElement method = (ExecutableElement) e;
-            if (method.isDefault()) continue;
-            if (method.getModifiers().contains(Modifier.STATIC)) continue;
+            if (method.isDefault())
+                continue;
+            if (method.getModifiers().contains(Modifier.STATIC))
+                continue;
 
             String name = method.getSimpleName().toString();
             TypeMirror returnType = method.getReturnType();
@@ -135,9 +143,8 @@ public class DaoApiProcessor extends AbstractProcessor {
 
     // --- Code generation ---
 
-    private void generateImpl(BufferedWriter bw, String packageName, String ifaceName,
-                               String implName, List<EntityConfigInfo> configs,
-                               List<MethodInfo> methods) throws IOException {
+    private void generateImpl(BufferedWriter bw, String packageName, String ifaceName, String implName,
+            List<EntityConfigInfo> configs, List<MethodInfo> methods) throws IOException {
         if (!packageName.isEmpty()) {
             bw.write("package " + packageName + ";\n\n");
         }
@@ -177,8 +184,8 @@ public class DaoApiProcessor extends AbstractProcessor {
         bw.write("}\n");
     }
 
-    private void generateMethod(BufferedWriter bw, MethodInfo method,
-                                 List<EntityConfigInfo> configs, String ifaceName) throws IOException {
+    private void generateMethod(BufferedWriter bw, MethodInfo method, List<EntityConfigInfo> configs, String ifaceName)
+            throws IOException {
         String returnTypeStr = toTypeString(method.returnType);
         String methodName = method.name;
 
@@ -186,16 +193,17 @@ public class DaoApiProcessor extends AbstractProcessor {
         boolean hasParams = method.queryValue != null && !method.params.isEmpty();
         if (hasParams) {
             boolean expandBean = method.params.size() == 1 && isBeanType(method.params.get(0).type);
-            String ppExpr = expandBean
-                    ? buildBeanQueryParamMapExpr(method.params.get(0))
+            String ppExpr = expandBean ? buildBeanQueryParamMapExpr(method.params.get(0))
                     : buildQueryParamMapExpr(method.params);
-            bw.write("    private static final java.util.Map<String, eu.aston.dao.impl.QueryParam> pp$" + methodName + " = " + ppExpr + ";\n");
+            bw.write("    private static final java.util.Map<String, eu.aston.dao.impl.QueryParam> pp$" + methodName
+                    + " = " + ppExpr + ";\n");
         }
 
         bw.write("    @Override\n");
         bw.write("    public " + returnTypeStr + " " + methodName + "(");
         for (int i = 0; i < method.params.size(); i++) {
-            if (i > 0) bw.write(", ");
+            if (i > 0)
+                bw.write(", ");
             bw.write(toTypeString(method.params.get(i).type) + " " + method.params.get(i).name);
         }
         bw.write(") {\n");
@@ -221,36 +229,41 @@ public class DaoApiProcessor extends AbstractProcessor {
             argsExpr = "null";
         } else {
             boolean expandBean = method.params.size() == 1 && isBeanType(method.params.get(0).type);
-            argsExpr = expandBean
-                    ? "expandBeanArgs(" + ppExpr + ", " + method.params.get(0).name + ")"
+            argsExpr = expandBean ? "expandBeanArgs(" + ppExpr + ", " + method.params.get(0).name + ")"
                     : "new Object[]{" + joinParamValues(method.params) + "}";
         }
 
         switch (kind) {
             case VOID -> bw.write("        queryExecute(\"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
             case INT -> bw.write("        return queryUpdate(\"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
-            case ONE -> bw.write("        return queryOne(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
-            case OPTIONAL -> bw.write("        return queryOptional(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
-            case LIST -> bw.write("        return queryList(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", " + argsExpr + ");\n");
+            case ONE -> bw.write("        return queryOne(" + elementType + ".class, \"" + sql + "\", " + ppExpr + ", "
+                    + argsExpr + ");\n");
+            case OPTIONAL -> bw.write("        return queryOptional(" + elementType + ".class, \"" + sql + "\", "
+                    + ppExpr + ", " + argsExpr + ");\n");
+            case LIST -> bw.write("        return queryList(" + elementType + ".class, \"" + sql + "\", " + ppExpr
+                    + ", " + argsExpr + ");\n");
         }
     }
 
-    private void generateEntityMethodBody(BufferedWriter bw, MethodInfo method,
-                                           List<EntityConfigInfo> configs, String ifaceName) throws IOException {
+    private void generateEntityMethodBody(BufferedWriter bw, MethodInfo method, List<EntityConfigInfo> configs,
+            String ifaceName) throws IOException {
         String name = method.name;
         if (name.startsWith("load")) {
             // Return type determines entity
             String returnTypeRaw = toRawTypeString(method.returnType);
             String configField = findConfigField(configs, returnTypeRaw);
-            bw.write("        return entityLoad(" + ifaceName + "." + configField + ", " + method.params.get(0).name + ");\n");
+            bw.write("        return entityLoad(" + ifaceName + "." + configField + ", " + method.params.get(0).name
+                    + ");\n");
         } else if (name.startsWith("insert")) {
             String paramTypeRaw = toRawTypeString(method.params.get(0).type);
             String configField = findConfigField(configs, paramTypeRaw);
-            bw.write("        entityInsert(" + ifaceName + "." + configField + ", " + method.params.get(0).name + ");\n");
+            bw.write("        entityInsert(" + ifaceName + "." + configField + ", " + method.params.get(0).name
+                    + ");\n");
         } else if (name.startsWith("update")) {
             String paramTypeRaw = toRawTypeString(method.params.get(0).type);
             String configField = findConfigField(configs, paramTypeRaw);
-            bw.write("        entityUpdate(" + ifaceName + "." + configField + ", " + method.params.get(0).name + ");\n");
+            bw.write("        entityUpdate(" + ifaceName + "." + configField + ", " + method.params.get(0).name
+                    + ");\n");
         } else if (name.startsWith("save")) {
             String paramTypeRaw = toRawTypeString(method.params.get(0).type);
             String configField = findConfigField(configs, paramTypeRaw);
@@ -259,25 +272,34 @@ public class DaoApiProcessor extends AbstractProcessor {
             if (method.params.size() == 1) {
                 String paramTypeRaw = toRawTypeString(method.params.get(0).type);
                 String configField = findConfigFieldOrFirst(configs, paramTypeRaw);
-                bw.write("        entityDelete(" + ifaceName + "." + configField + ", " + method.params.get(0).name + ");\n");
+                bw.write("        entityDelete(" + ifaceName + "." + configField + ", " + method.params.get(0).name
+                        + ");\n");
             }
         }
     }
 
     // --- Return type helpers ---
 
-    enum ReturnKind { VOID, INT, ONE, OPTIONAL, LIST }
+    enum ReturnKind {
+        VOID, INT, ONE, OPTIONAL, LIST
+    }
 
     private ReturnKind resolveReturnKind(TypeMirror returnType) {
-        if (returnType.getKind() == TypeKind.VOID) return ReturnKind.VOID;
-        if (returnType.getKind() == TypeKind.INT) return ReturnKind.INT;
-        if (returnType.getKind() == TypeKind.LONG) return ReturnKind.ONE;
+        if (returnType.getKind() == TypeKind.VOID)
+            return ReturnKind.VOID;
+        if (returnType.getKind() == TypeKind.INT)
+            return ReturnKind.INT;
+        if (returnType.getKind() == TypeKind.LONG)
+            return ReturnKind.ONE;
         if (returnType.getKind() == TypeKind.DECLARED) {
             DeclaredType dt = (DeclaredType) returnType;
             String name = ((TypeElement) dt.asElement()).getQualifiedName().toString();
-            if ("java.lang.Integer".equals(name)) return ReturnKind.INT;
-            if ("java.util.Optional".equals(name)) return ReturnKind.OPTIONAL;
-            if ("java.util.List".equals(name)) return ReturnKind.LIST;
+            if ("java.lang.Integer".equals(name))
+                return ReturnKind.INT;
+            if ("java.util.Optional".equals(name))
+                return ReturnKind.OPTIONAL;
+            if ("java.util.List".equals(name))
+                return ReturnKind.LIST;
         }
         return ReturnKind.ONE;
     }
@@ -294,26 +316,29 @@ public class DaoApiProcessor extends AbstractProcessor {
                 TypeMirror arg = dt.getTypeArguments().get(0);
                 String rawType = toRawTypeString(arg);
                 String genericExpr = toGenericTypeExpression(arg);
-                return new String[]{rawType, genericExpr};
+                return new String[] { rawType, genericExpr };
             }
         }
         if (returnType.getKind() == TypeKind.LONG) {
-            return new String[]{"long", "long.class"};
+            return new String[] { "long", "long.class" };
         }
         String raw = toRawTypeString(returnType);
-        return new String[]{raw, raw + ".class"};
+        return new String[] { raw, raw + ".class" };
     }
 
     private String toGenericTypeExpression(TypeMirror type) {
-        if (type.getKind().isPrimitive()) return type.toString() + ".class";
+        if (type.getKind().isPrimitive())
+            return type.toString() + ".class";
         if (type.getKind() == TypeKind.DECLARED) {
             DeclaredType dt = (DeclaredType) type;
             String rawName = ((TypeElement) dt.asElement()).getQualifiedName().toString();
-            if (dt.getTypeArguments().isEmpty()) return rawName + ".class";
+            if (dt.getTypeArguments().isEmpty())
+                return rawName + ".class";
             var sb = new StringBuilder();
             sb.append("new eu.aston.beanmeta.ParameterizedTypeImpl(").append(rawName).append(".class, new Type[]{");
             for (int i = 0; i < dt.getTypeArguments().size(); i++) {
-                if (i > 0) sb.append(", ");
+                if (i > 0)
+                    sb.append(", ");
                 sb.append(toGenericTypeExpression(dt.getTypeArguments().get(i)));
             }
             sb.append("})");
@@ -326,16 +351,19 @@ public class DaoApiProcessor extends AbstractProcessor {
 
     private String findConfigField(List<EntityConfigInfo> configs, String entityType) {
         for (EntityConfigInfo c : configs) {
-            if (c.entityType.equals(entityType)) return c.fieldName;
+            if (c.entityType.equals(entityType))
+                return c.fieldName;
         }
         throw new RuntimeException("No EntityConfig found for type: " + entityType);
     }
 
     private String findConfigFieldOrFirst(List<EntityConfigInfo> configs, String entityType) {
         for (EntityConfigInfo c : configs) {
-            if (c.entityType.equals(entityType)) return c.fieldName;
+            if (c.entityType.equals(entityType))
+                return c.fieldName;
         }
-        if (configs.size() == 1) return configs.get(0).fieldName;
+        if (configs.size() == 1)
+            return configs.get(0).fieldName;
         throw new RuntimeException("No EntityConfig found for type: " + entityType);
     }
 
@@ -346,7 +374,8 @@ public class DaoApiProcessor extends AbstractProcessor {
     }
 
     private String toRawTypeString(TypeMirror type) {
-        if (type.getKind().isPrimitive()) return type.toString();
+        if (type.getKind().isPrimitive())
+            return type.toString();
         if (type.getKind() == TypeKind.DECLARED) {
             DeclaredType dt = (DeclaredType) type;
             return ((TypeElement) dt.asElement()).getQualifiedName().toString();
@@ -357,18 +386,21 @@ public class DaoApiProcessor extends AbstractProcessor {
     /** Generate QueryParam map from bean properties via BeanMetaRegistry (runtime resolution). */
     private String buildBeanQueryParamMapExpr(ParamInfo beanParam) {
         String beanType = toRawTypeString(beanParam.type);
-        return "eu.aston.dao.impl.QueryParam.fromBeanMeta(eu.aston.beanmeta.BeanMetaRegistry.forClass(" + beanType + ".class))";
+        return "eu.aston.dao.impl.QueryParam.fromBeanMeta(eu.aston.beanmeta.BeanMetaRegistry.forClass(" + beanType
+                + ".class))";
     }
 
     /** Generate Map.of("name", new QueryParam("name", 0, Type.class), ...) expression. */
     private String buildQueryParamMapExpr(List<ParamInfo> params) {
         var sb = new StringBuilder("java.util.Map.of(");
         for (int i = 0; i < params.size(); i++) {
-            if (i > 0) sb.append(", ");
+            if (i > 0)
+                sb.append(", ");
             String name = params.get(i).name;
             String typeName = toRawTypeString(params.get(i).type);
             sb.append("\"").append(name).append("\", ");
-            sb.append("new eu.aston.dao.impl.QueryParam(\"").append(name).append("\", ").append(i).append(", ").append(typeName).append(".class)");
+            sb.append("new eu.aston.dao.impl.QueryParam(\"").append(name).append("\", ").append(i).append(", ")
+                    .append(typeName).append(".class)");
         }
         sb.append(")");
         return sb.toString();
@@ -377,35 +409,31 @@ public class DaoApiProcessor extends AbstractProcessor {
     private String joinParamValues(List<ParamInfo> params) {
         var sb = new StringBuilder();
         for (int i = 0; i < params.size(); i++) {
-            if (i > 0) sb.append(", ");
+            if (i > 0)
+                sb.append(", ");
             sb.append(params.get(i).name);
         }
         return sb.toString();
     }
 
-    private static final Set<String> SCALAR_TYPE_NAMES = Set.of(
-            "java.lang.String", "java.lang.Boolean", "boolean",
-            "java.lang.Integer", "int", "java.lang.Long", "long",
-            "java.lang.Short", "short", "java.lang.Byte", "byte",
-            "java.lang.Float", "float", "java.lang.Double", "double",
-            "java.math.BigDecimal", "java.time.Instant", "java.time.LocalDate", "java.time.LocalDateTime",
-            "java.util.UUID", "byte[]",
-            "eu.aston.dao.Spread", "eu.aston.dao.ICondition"
-    );
+    private static final Set<String> SCALAR_TYPE_NAMES = Set.of("java.lang.String", "java.lang.Boolean", "boolean",
+            "java.lang.Integer", "int", "java.lang.Long", "long", "java.lang.Short", "short", "java.lang.Byte", "byte",
+            "java.lang.Float", "float", "java.lang.Double", "double", "java.math.BigDecimal", "java.time.Instant",
+            "java.time.LocalDate", "java.time.LocalDateTime", "java.util.UUID", "byte[]", "eu.aston.dao.Spread",
+            "eu.aston.dao.ICondition");
 
     private boolean isBeanType(TypeMirror type) {
-        if (type.getKind().isPrimitive()) return false;
-        if (type.getKind() != TypeKind.DECLARED) return false;
+        if (type.getKind().isPrimitive())
+            return false;
+        if (type.getKind() != TypeKind.DECLARED)
+            return false;
         String name = ((TypeElement) ((DeclaredType) type).asElement()).getQualifiedName().toString();
         return !SCALAR_TYPE_NAMES.contains(name);
     }
 
     private String escapeJava(String s) {
-        return s.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t",
+                "\\t");
     }
 
     private String getPackageName(TypeElement typeElement) {
@@ -418,8 +446,7 @@ public class DaoApiProcessor extends AbstractProcessor {
 
     private void writeServiceFile() {
         try {
-            FileObject resource = processingEnv.getFiler().createResource(
-                    StandardLocation.CLASS_OUTPUT, "",
+            FileObject resource = processingEnv.getFiler().createResource(StandardLocation.CLASS_OUTPUT, "",
                     "META-INF/services/eu.aston.dao.DaoProvider");
             try (Writer writer = resource.openWriter()) {
                 for (String entry : generatedServiceEntries) {
@@ -434,10 +461,14 @@ public class DaoApiProcessor extends AbstractProcessor {
 
     // --- Inner records ---
 
-    private record EntityConfigInfo(String fieldName, String entityType) {}
-    private record ParamInfo(String name, TypeMirror type) {}
-    private record MethodInfo(String name, TypeMirror returnType, TypeMirror genericReturnType,
-                              List<ParamInfo> params, String queryValue, ExecutableElement element) {
+    private record EntityConfigInfo(String fieldName, String entityType) {
+    }
+
+    private record ParamInfo(String name, TypeMirror type) {
+    }
+
+    private record MethodInfo(String name, TypeMirror returnType, TypeMirror genericReturnType, List<ParamInfo> params,
+            String queryValue, ExecutableElement element) {
         TypeMirror getGenericReturnType() {
             return element.getReturnType();
         }

@@ -22,11 +22,25 @@ public final class EntityConfig<T> {
         this.updatedAt = updatedAt;
     }
 
-    public Class<T> type() { return type; }
-    public String table() { return table; }
-    public String pk() { return pk; }
-    public String createdAt() { return createdAt; }
-    public String updatedAt() { return updatedAt; }
+    public Class<T> type() {
+        return type;
+    }
+
+    public String table() {
+        return table;
+    }
+
+    public String pk() {
+        return pk;
+    }
+
+    public String createdAt() {
+        return createdAt;
+    }
+
+    public String updatedAt() {
+        return updatedAt;
+    }
 
     public EntityBinder<T> binder() {
         EntityBinder<T> b = binder;
@@ -58,9 +72,20 @@ public final class EntityConfig<T> {
             this.table = table;
         }
 
-        public Builder<T> pk(String pk) { this.pk = pk; return this; }
-        public Builder<T> createdAt(String createdAt) { this.createdAt = createdAt; return this; }
-        public Builder<T> updatedAt(String updatedAt) { this.updatedAt = updatedAt; return this; }
+        public Builder<T> pk(String pk) {
+            this.pk = pk;
+            return this;
+        }
+
+        public Builder<T> createdAt(String createdAt) {
+            this.createdAt = createdAt;
+            return this;
+        }
+
+        public Builder<T> updatedAt(String updatedAt) {
+            this.updatedAt = updatedAt;
+            return this;
+        }
 
         public EntityConfig<T> build() {
             return new EntityConfig<>(type, table, pk, createdAt, updatedAt);
